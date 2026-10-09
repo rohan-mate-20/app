@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../core/config/env_config.dart';
 import 'payment_helper_stub.dart' if (dart.library.js) 'payment_helper_web.dart';
@@ -62,10 +64,48 @@ class PaymentService {
     required double amount,
     String currency = 'INR',
   }) async {
+    final amountInPaise = (amount * 100).round();
+    try {
+      final authStr = base64Encode(
+        utf8.encode('${EnvConfig.razorpayKeyId}:${EnvConfig.razorpayKeySecret}'),
+      );
+      final response = await http.post(
+        Uri.parse('https://api.razorpay.com/v1/orders'),
+        headers: {
+          'Authorization': 'Basic $authStr',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'amount': amountInPaise,
+          'currency': currency,
+          'receipt': 'kmart_${DateTime.now().millisecondsSinceEpoch}',
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final realOrderId = data['id'] as String;
+        debugPrint('[PaymentService] ✅ Live Razorpay Order created: $realOrderId');
+        return RazorpayOrderResponse(
+          success: true,
+          orderId: realOrderId,
+          amountInPaise: amountInPaise,
+          currency: currency,
+          keyId: EnvConfig.razorpayKeyId,
+          isMock: false,
+        );
+      } else {
+        debugPrint('[PaymentService] Razorpay API response: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('[PaymentService] Could not call Razorpay API directly: $e');
+    }
+
+    // Fallback: standard test order ID
     return RazorpayOrderResponse(
       success: true,
       orderId: 'order_${DateTime.now().millisecondsSinceEpoch}',
-      amountInPaise: (amount * 100).round(),
+      amountInPaise: amountInPaise,
       currency: currency,
       keyId: EnvConfig.razorpayKeyId,
       isMock: true,
@@ -86,12 +126,11 @@ class PaymentService {
     _onFailure = onFailure;
     _onExternalWallet = onExternalWallet;
 
-    final options = {
+    final options = <String, dynamic>{
       'key': order.keyId.isNotEmpty ? order.keyId : EnvConfig.razorpayKeyId,
       'amount': order.amountInPaise,
       'name': EnvConfig.appName,
       'description': 'Order Payment',
-      'order_id': order.orderId,
       'prefill': {
         'contact': customerPhone,
         'email': customerEmail ?? 'customer@kmart.com',
@@ -99,6 +138,11 @@ class PaymentService {
       },
       'theme': {'color': '#E53935'},
     };
+
+    // If order was created on Razorpay API, include order_id
+    if (!order.isMock && order.orderId.isNotEmpty) {
+      options['order_id'] = order.orderId;
+    }
 
     if (kIsWeb) {
       PaymentHelper.openWebCheckout(

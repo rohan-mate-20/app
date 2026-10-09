@@ -123,7 +123,12 @@ class CatalogProvider with ChangeNotifier {
   }
 
   List<ProductModel> get popularProducts {
-    return _allProducts.take(8).toList();
+    if (_allProducts.isEmpty) return [];
+    final priority = _allProducts.where((p) => p.discountPercent > 0 || (p.brand != null && p.brand != 'K MART')).toList();
+    if (priority.isNotEmpty) {
+      return priority.take(16).toList();
+    }
+    return _allProducts.take(16).toList();
   }
 
   List<ProductModel> get discountedProducts {

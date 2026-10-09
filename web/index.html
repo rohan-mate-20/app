@@ -33,6 +33,42 @@
   <link rel="manifest" href="manifest.json">
   <!-- Razorpay Checkout for Web -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    window.openKmartRazorpay = function(options, successCb, errorCb) {
+      try {
+        var cleanOptions = {};
+        for (var k in options) {
+          if (options.hasOwnProperty(k)) {
+            cleanOptions[k] = options[k];
+          }
+        }
+        cleanOptions.handler = function(response) {
+          if (successCb) {
+            successCb(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
+          }
+        };
+        cleanOptions.modal = cleanOptions.modal || {};
+        cleanOptions.modal.ondismiss = function() {
+          if (errorCb) {
+            errorCb(2, "Payment cancelled by user");
+          }
+        };
+        var rzp = new window.Razorpay(cleanOptions);
+        rzp.on('payment.failed', function(resp) {
+          if (errorCb) {
+            var err = (resp && resp.error) ? resp.error : {};
+            errorCb(err.code || 0, err.description || "Payment failed");
+          }
+        });
+        rzp.open();
+      } catch (err) {
+        console.error("Razorpay Web open exception:", err);
+        if (errorCb) {
+          errorCb(0, err.message || "Failed to initialize Razorpay");
+        }
+      }
+    };
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

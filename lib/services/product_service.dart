@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/product_model.dart';
 import '../models/category_model.dart';
 import 'supabase_service.dart';
@@ -17,7 +17,8 @@ class ProductService {
             inventory ( store_id, stock_quantity )
           ''')
           .eq('active', true)
-          .order('name');
+          .order('name', ascending: true)
+          .limit(1000);
 
       final list = response as List;
       return list

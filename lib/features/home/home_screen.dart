@@ -462,7 +462,7 @@ class HomeScreen extends StatelessWidget {
                 )
               else
                 SizedBox(
-                  height: 250,
+                  height: 275,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
@@ -476,6 +476,176 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 24),
+
+              // Category Filter Pills on HomeScreen
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          catalogProvider.selectedCategorySlug == 'all'
+                              ? 'All Products'
+                              : catalogProvider.categories
+                                  .firstWhere(
+                                    (c) => c.slug == catalogProvider.selectedCategorySlug,
+                                    orElse: () => catalogProvider.categories.first,
+                                  )
+                                  .name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyDark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Showing ${catalogProvider.filteredProducts.length} items',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CategoriesScreen(),
+                          ),
+                        );
+                      },
+                      child: const Row(
+                        children: [
+                          Text(
+                            'Explore All',
+                            style: TextStyle(
+                              color: AppColors.primaryRed,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: AppColors.primaryRed,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Horizontal Category Chips
+              SizedBox(
+                height: 38,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: catalogProvider.categories.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final isAll = index == 0;
+                    final slug = isAll ? 'all' : catalogProvider.categories[index - 1].slug;
+                    final name = isAll ? 'All Items' : catalogProvider.categories[index - 1].name;
+                    final isSelected = catalogProvider.selectedCategorySlug == slug;
+
+                    return ChoiceChip(
+                      label: Text(name),
+                      selected: isSelected,
+                      selectedColor: AppColors.primaryRed,
+                      backgroundColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primaryRed : AppColors.cardBorder,
+                        ),
+                      ),
+                      onSelected: (_) => catalogProvider.selectCategory(slug),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Responsive Product Grid
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: catalogProvider.filteredProducts.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(32),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.search_off_rounded,
+                              size: 48,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'No products found in this category',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () => catalogProvider.selectCategory('all'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryRed,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text('View All Items'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final width = constraints.maxWidth;
+                          final int columns = width > 900 ? 4 : (width > 550 ? 3 : 2);
+                          final products = catalogProvider.filteredProducts;
+
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              childAspectRatio: width > 550 ? 0.68 : 0.62,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 14,
+                            ),
+                            itemCount: products.length,
+                            itemBuilder: (context, index) {
+                              return ProductCard(product: products[index]);
+                            },
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 28),
 
               // Great Deals Every Day Card
               Padding(

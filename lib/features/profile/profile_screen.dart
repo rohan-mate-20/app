@@ -309,33 +309,36 @@ class ProfileScreen extends StatelessWidget {
     required VoidCallback onTap,
     Color? iconColor,
   }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.navyDark).withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (iconColor ?? AppColors.navyDark).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor ?? AppColors.navyDark, size: 22),
         ),
-        child: Icon(icon, color: iconColor ?? AppColors.navyDark, size: 22),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-          color: iconColor ?? AppColors.textPrimary,
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: iconColor ?? AppColors.textPrimary,
+          ),
         ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppColors.textMuted,
+          size: 20,
+        ),
+        onTap: onTap,
       ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-      ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: AppColors.textMuted,
-        size: 20,
-      ),
-      onTap: onTap,
     );
   }
 }

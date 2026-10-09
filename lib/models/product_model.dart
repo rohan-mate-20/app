@@ -184,15 +184,38 @@ class ProductModel {
       }
     }
 
-    final prodName = json['name'] ?? 'Grocery Product';
+    final rawName = (json['name'] ?? 'Grocery Product').toString();
+    // Clean up leading dots/symbols like .AMUL CHEESE or ..DHANA DAL
+    final prodName = rawName.replaceAll(RegExp(r'^[\.\s\-_]+'), '').trim();
     final img = resolveImage(prodName, json['image_url']);
+
+    // Infer brand from name if null
+    String inferredBrand = (json['brand'] ?? '').toString().trim();
+    if (inferredBrand.isEmpty || inferredBrand == 'null') {
+      final upper = prodName.toUpperCase();
+      if (upper.contains('AMUL')) inferredBrand = 'Amul';
+      else if (upper.contains('CADBURY')) inferredBrand = 'Cadbury';
+      else if (upper.contains('LOREAL') || upper.contains("L'OREAL")) inferredBrand = "L'Oreal";
+      else if (upper.contains('BRITANNIA')) inferredBrand = 'Britannia';
+      else if (upper.contains('PARLE')) inferredBrand = 'Parle';
+      else if (upper.contains('LIZOL')) inferredBrand = 'Lizol';
+      else if (upper.contains('LIFEBUOY')) inferredBrand = 'Lifebuoy';
+      else if (upper.contains('ACT II') || upper.contains('ACTII')) inferredBrand = 'Act II';
+      else if (upper.contains('LIJJAT')) inferredBrand = 'Lijjat';
+      else if (upper.contains('COLGATE')) inferredBrand = 'Colgate';
+      else if (upper.contains('SURF')) inferredBrand = 'Surf Excel';
+      else if (upper.contains('DETTOL')) inferredBrand = 'Dettol';
+      else if (upper.contains('SAFFOLA')) inferredBrand = 'Saffola';
+      else if (upper.contains('FORTUNE')) inferredBrand = 'Fortune';
+      else inferredBrand = 'K MART';
+    }
 
     return ProductModel(
       id: json['id'] ?? '',
       sku: json['sku'],
       barcode: json['barcode'],
-      name: prodName,
-      brand: json['brand'] ?? 'K MART',
+      name: prodName.isNotEmpty ? prodName : rawName,
+      brand: inferredBrand,
       categoryId: json['category_id'],
       categoryName: catName,
       categorySlug: categoryNameToSlug(catName),
