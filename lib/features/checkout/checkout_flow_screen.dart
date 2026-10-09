@@ -12,7 +12,6 @@ import '../../providers/orders_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
-import '../auth/login_screen.dart';
 import '../location/location_selector_sheet.dart';
 import '../orders/order_success_screen.dart';
 
@@ -43,14 +42,6 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
   void initState() {
     super.initState();
     final authProvider = context.read<AuthProvider>();
-    if (!authProvider.isLoggedIn) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      });
-    }
     final customer = authProvider.currentCustomer;
     _nameController = TextEditingController(text: customer?.name ?? '');
     _phoneController = TextEditingController(text: customer?.phone ?? '');

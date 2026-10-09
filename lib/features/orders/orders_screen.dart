@@ -47,7 +47,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           }
         },
         color: AppColors.primaryRed,
-        child: !context.watch<AuthProvider>().isLoggedIn
+        child: (!context.watch<AuthProvider>().isLoggedIn && orders.isEmpty)
             ? EmptyStateView(
                 title: 'Sign In to View Orders',
                 message: 'Log in with your mobile number to view and track your orders.',
