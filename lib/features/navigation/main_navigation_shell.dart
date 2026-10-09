@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/catalog_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../cart/cart_screen.dart';
@@ -36,6 +37,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CatalogProvider>().loadCatalog();
+        context.read<StoreDeliveryProvider>().loadInitialData();
+      }
+    });
   }
 
   @override

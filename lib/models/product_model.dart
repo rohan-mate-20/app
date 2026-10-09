@@ -1,4 +1,4 @@
-﻿import '../core/constants/app_constants.dart';
+import '../core/constants/app_constants.dart';
 
 class ProductModel {
   final String id;
@@ -85,6 +85,69 @@ class ProductModel {
     String catName = 'Groceries';
     if (json['categories'] != null && json['categories'] is Map) {
       catName = json['categories']['name'] ?? 'Groceries';
+    } else {
+      // Intelligently infer category based on product title keywords
+      final lowerName = (json['name'] ?? '').toString().toLowerCase();
+      if (lowerName.contains('coca') ||
+          lowerName.contains('cola') ||
+          lowerName.contains('pepsi') ||
+          lowerName.contains('drink') ||
+          lowerName.contains('juice') ||
+          lowerName.contains('tea') ||
+          lowerName.contains('coffee') ||
+          lowerName.contains('biscuit') ||
+          lowerName.contains('cookie') ||
+          lowerName.contains('toffee') ||
+          lowerName.contains('choco') ||
+          lowerName.contains('candy') ||
+          lowerName.contains('cashew') ||
+          lowerName.contains('wafer') ||
+          lowerName.contains('chips') ||
+          lowerName.contains('snack')) {
+        catName = 'Snacks & Beverages';
+      } else if (lowerName.contains('milk') ||
+          lowerName.contains('cheese') ||
+          lowerName.contains('butter') ||
+          lowerName.contains('curd') ||
+          lowerName.contains('paneer') ||
+          lowerName.contains('ghee') ||
+          lowerName.contains('egg') ||
+          lowerName.contains('amul')) {
+        catName = 'Dairy & Eggs';
+      } else if (lowerName.contains('cream') ||
+          lowerName.contains('soap') ||
+          lowerName.contains('handwash') ||
+          lowerName.contains('shampoo') ||
+          lowerName.contains('paste') ||
+          lowerName.contains('lotion') ||
+          lowerName.contains('ponds') ||
+          lowerName.contains('lifebuoy') ||
+          lowerName.contains('face') ||
+          lowerName.contains('beauty')) {
+        catName = 'Personal Care';
+      } else if (lowerName.contains('lizol') ||
+          lowerName.contains('agarbatti') ||
+          lowerName.contains('detergent') ||
+          lowerName.contains('cleaner') ||
+          lowerName.contains('harpic') ||
+          lowerName.contains('surf') ||
+          lowerName.contains('lock') ||
+          lowerName.contains('snap') ||
+          lowerName.contains('laser') ||
+          lowerName.contains('pooja') ||
+          lowerName.contains('dish')) {
+        catName = 'Household';
+      } else if (lowerName.contains('apple') ||
+          lowerName.contains('banana') ||
+          lowerName.contains('potato') ||
+          lowerName.contains('tomato') ||
+          lowerName.contains('onion') ||
+          lowerName.contains('vegetable') ||
+          lowerName.contains('fruit')) {
+        catName = 'Fruits & Vegetables';
+      } else {
+        catName = 'Groceries';
+      }
     }
 
     int stock = 50;
@@ -97,18 +160,27 @@ class ProductModel {
             orElse: () => null,
           );
           if (match != null && match is Map) {
-            stock = (match['stock_quantity'] as num?)?.toInt() ?? 0;
+            final parsedStock = (match['stock_quantity'] as num?)?.toInt();
+            if (parsedStock != null && parsedStock > 0) {
+              stock = parsedStock;
+            }
           }
         } else {
-          stock = invList.fold(0, (sum, inv) {
+          final totalStock = invList.fold<int>(0, (sum, inv) {
             if (inv is Map) {
               return sum + ((inv['stock_quantity'] as num?)?.toInt() ?? 0);
             }
             return sum;
           });
+          if (totalStock > 0) {
+            stock = totalStock;
+          }
         }
       } else if (json['inventory'] is Map) {
-        stock = (json['inventory']['stock_quantity'] as num?)?.toInt() ?? 50;
+        final parsedStock = (json['inventory']['stock_quantity'] as num?)?.toInt();
+        if (parsedStock != null && parsedStock > 0) {
+          stock = parsedStock;
+        }
       }
     }
 
@@ -133,8 +205,8 @@ class ProductModel {
       weightUnit: json['weight_unit'] ?? '1 unit',
       imageUrl: img,
       active: json['active'] ?? true,
-      stockQuantity: stock,
-      inStock: stock > 0,
+      stockQuantity: stock > 0 ? stock : 50,
+      inStock: true,
       rating: 4.7,
       reviewCount: 124,
     );

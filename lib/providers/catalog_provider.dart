@@ -87,7 +87,11 @@ class CatalogProvider with ChangeNotifier {
 
     // 1. Filter by category
     if (_selectedCategorySlug != 'all') {
-      list = list.where((p) => p.categorySlug == _selectedCategorySlug).toList();
+      final categoryMatches = list.where((p) => p.categorySlug == _selectedCategorySlug).toList();
+      // If the category has exact matches, show them; otherwise fallback to all products
+      if (categoryMatches.isNotEmpty) {
+        list = categoryMatches;
+      }
     }
 
     // 2. Filter by search query
