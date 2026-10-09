@@ -1,4 +1,4 @@
-﻿import 'cart_item_model.dart';
+import 'cart_item_model.dart';
 import 'address_model.dart';
 import 'product_model.dart';
 
@@ -25,6 +25,16 @@ class OrderStatusHistoryModel {
       changedBy: json['changed_by'],
       changedAt: DateTime.tryParse(json['changed_at'] ?? '') ?? DateTime.now(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'order_id': orderId,
+      'status': status,
+      'changed_by': changedBy,
+      'changed_at': changedAt.toIso8601String(),
+    };
   }
 }
 
@@ -72,6 +82,52 @@ class OrderModel {
     this.statusHistory = const [],
     this.paymentId,
   });
+
+  OrderModel copyWith({
+    String? id,
+    String? orderNumber,
+    String? customerId,
+    String? storeId,
+    String? orderType,
+    String? status,
+    String? paymentStatus,
+    String? paymentMethod,
+    double? subtotal,
+    double? deliveryFee,
+    double? total,
+    String? deliverySlotId,
+    String? scheduledDeliveryDate,
+    String? deliverySlotTime,
+    AddressModel? deliveryAddress,
+    Map<String, dynamic>? customerSnapshot,
+    DateTime? createdAt,
+    List<CartItemModel>? items,
+    List<OrderStatusHistoryModel>? statusHistory,
+    String? paymentId,
+  }) {
+    return OrderModel(
+      id: id ?? this.id,
+      orderNumber: orderNumber ?? this.orderNumber,
+      customerId: customerId ?? this.customerId,
+      storeId: storeId ?? this.storeId,
+      orderType: orderType ?? this.orderType,
+      status: status ?? this.status,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      subtotal: subtotal ?? this.subtotal,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      total: total ?? this.total,
+      deliverySlotId: deliverySlotId ?? this.deliverySlotId,
+      scheduledDeliveryDate: scheduledDeliveryDate ?? this.scheduledDeliveryDate,
+      deliverySlotTime: deliverySlotTime ?? this.deliverySlotTime,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      customerSnapshot: customerSnapshot ?? this.customerSnapshot,
+      createdAt: createdAt ?? this.createdAt,
+      items: items ?? this.items,
+      statusHistory: statusHistory ?? this.statusHistory,
+      paymentId: paymentId ?? this.paymentId,
+    );
+  }
 
   String get displayStatus {
     switch (status.toUpperCase()) {
@@ -182,5 +238,37 @@ class OrderModel {
       statusHistory: history,
       paymentId: json['payment_id'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'order_number': orderNumber,
+      'customer_id': customerId,
+      'store_id': storeId,
+      'order_type': orderType,
+      'status': status,
+      'payment_status': paymentStatus,
+      'payment_method': paymentMethod,
+      'subtotal': subtotal,
+      'delivery_fee': deliveryFee,
+      'total': total,
+      'delivery_slot_id': deliverySlotId,
+      'scheduled_delivery_date': scheduledDeliveryDate,
+      'delivery_address_snapshot': deliveryAddress?.toJson(),
+      'customer_snapshot': customerSnapshot,
+      'created_at': createdAt.toIso8601String(),
+      'payment_id': paymentId,
+      'order_items': items.map((i) => {
+        'product_id': i.product.id,
+        'product_name': i.product.name,
+        'quantity': i.quantity,
+        'unit_selling_price': i.product.sellingPrice,
+        'unit_mrp': i.product.mrp,
+        'line_total': i.lineTotal,
+        'products': i.product.toJson(),
+      }).toList(),
+      'order_status_history': statusHistory.map((h) => h.toJson()).toList(),
+    };
   }
 }

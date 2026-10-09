@@ -1,7 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/orders_provider.dart';
+import '../../providers/store_delivery_provider.dart';
 import '../cart/cart_screen.dart';
 import '../categories/categories_screen.dart';
 import '../home/home_screen.dart';
@@ -19,6 +22,7 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   late int _currentIndex;
+  String? _initializedCustomerId;
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -32,6 +36,26 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncCustomerData();
+  }
+
+  void _syncCustomerData() {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final customer = authProvider.currentCustomer;
+    if (customer != null && customer.id != _initializedCustomerId) {
+      _initializedCustomerId = customer.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<CartProvider>().initForCustomer(customer.id);
+        context.read<StoreDeliveryProvider>().loadCustomerAddresses(customer.id);
+        context.read<OrdersProvider>().loadOrders(customer.id);
+      });
+    }
   }
 
   @override

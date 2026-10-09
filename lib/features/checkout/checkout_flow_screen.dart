@@ -1,9 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
-import '../../models/address_model.dart';
+import '../../models/customer_model.dart';
 import '../../models/delivery_slot_model.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
@@ -12,6 +12,7 @@ import '../../providers/orders_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
+import '../auth/login_screen.dart';
 import '../location/location_selector_sheet.dart';
 import '../orders/order_success_screen.dart';
 
@@ -35,12 +36,24 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
   // Step 4: Payment method
   String _paymentMethod = 'ONLINE'; // 'ONLINE' (Razorpay) or 'COD'
 
+  // Step 2: Selected slot date
+  String? _selectedSlotDate;
+
   @override
   void initState() {
     super.initState();
-    final customer = context.read<AuthProvider>().currentCustomer;
-    _nameController = TextEditingController(text: customer?.name ?? 'Sakshi');
-    _phoneController = TextEditingController(text: customer?.phone ?? '9876543210');
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      });
+    }
+    final customer = authProvider.currentCustomer;
+    _nameController = TextEditingController(text: customer?.name ?? '');
+    _phoneController = TextEditingController(text: customer?.phone ?? '');
     _emailController = TextEditingController(text: customer?.email ?? '');
     _dobController = TextEditingController(text: customer?.dob ?? '');
   }
@@ -98,16 +111,27 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
   }
 
   void _handlePlaceOrder() async {
-    final authCust = context.read<AuthProvider>().currentCustomer;
+    final authProvider = context.read<AuthProvider>();
     final storeProvider = context.read<StoreDeliveryProvider>();
     final cartProvider = context.read<CartProvider>();
     final ordersProvider = context.read<OrdersProvider>();
 
-    if (authCust == null || storeProvider.selectedAddress == null || cartProvider.isEmpty) {
+    if (cartProvider.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your cart is empty'),
+          backgroundColor: AppColors.primaryRed,
+        ),
+      );
       return;
     }
 
-    final address = storeProvider.selectedAddress!;
+    final address = storeProvider.selectedAddress ?? StoreDeliveryProvider.defaultSampleAddress;
+    final authCust = authProvider.currentCustomer ?? CustomerModel(
+      id: 'cust_${DateTime.now().millisecondsSinceEpoch}',
+      phone: address.phone.isNotEmpty ? address.phone : '9876543210',
+      name: address.fullName.isNotEmpty ? address.fullName : 'Customer',
+    );
     final settings = storeProvider.deliverySettings;
     final subtotal = cartProvider.itemTotal;
     final delFee = cartProvider.calculateDeliveryFee(settings);
@@ -133,6 +157,13 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
             builder: (_) => OrderSuccessScreen(order: order),
           ),
         );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ordersProvider.errorMessage ?? 'Failed to place order. Please try again.'),
+            backgroundColor: AppColors.primaryRed,
+          ),
+        );
       }
     } else {
       // Razorpay Online Flow
@@ -153,13 +184,15 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
             ),
           );
         },
-        onFailure: (String err) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(err),
-              backgroundColor: AppColors.primaryRed,
-            ),
-          );
+        onFailure: (String errorMsg) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMsg),
+                backgroundColor: AppColors.primaryRed,
+              ),
+            );
+          }
         },
       );
     }
@@ -595,72 +628,171 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Slots grid / cards
-        Row(
-          children: slots.map((slot) {
-            final isSelected = (selectedSlot?.id == slot.id) ||
-                (selectedSlot == null && slot.slotName == 'Morning');
+        // Date Tabs + Slot Cards Grid
+        () {
+          final uniqueDates = slots.map((s) => s.slotDate).toSet().toList();
+          uniqueDates.sort();
 
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => storeProvider.selectSlot(slot),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primaryRed : AppColors.cardBorder,
-                      width: isSelected ? 1.8 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Icon(
-                            slot.slotName == 'Morning'
-                                ? Icons.wb_sunny_outlined
-                                : Icons.nightlight_outlined,
-                            color: isSelected ? AppColors.primaryRed : AppColors.navyDark,
-                            size: 22,
+          final activeDate = _selectedSlotDate ??
+              (selectedSlot?.slotDate ?? (uniqueDates.isNotEmpty ? uniqueDates.first : ''));
+
+          final dateSlots = slots.where((s) => s.slotDate == activeDate).toList();
+          final Map<String, DeliverySlotModel> slotByName = {};
+          for (final s in dateSlots) {
+            if (!slotByName.containsKey(s.slotName)) {
+              slotByName[s.slotName] = s;
+            }
+          }
+          List<DeliverySlotModel> displaySlots = slotByName.values.toList();
+          if (displaySlots.isEmpty && slots.isNotEmpty) {
+            final Map<String, DeliverySlotModel> fallbackByName = {};
+            for (final s in slots) {
+              if (!fallbackByName.containsKey(s.slotName)) {
+                fallbackByName[s.slotName] = s;
+              }
+            }
+            displaySlots = fallbackByName.values.toList();
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Horizontal Date Selector
+              if (uniqueDates.isNotEmpty) ...[
+                SizedBox(
+                  height: 40,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: uniqueDates.length,
+                    itemBuilder: (context, index) {
+                      final dStr = uniqueDates[index];
+                      final isSelected = activeDate == dStr;
+                      DateTime? dt = DateTime.tryParse(dStr);
+                      String label = dStr;
+                      if (dt != null) {
+                        final now = DateTime.now();
+                        if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+                          label = 'Today';
+                        } else if (dt.year == now.year && dt.month == now.month && dt.day == now.day + 1) {
+                          label = 'Tomorrow';
+                        } else {
+                          label = '${dt.day}/${dt.month}';
+                        }
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(label),
+                          selected: isSelected,
+                          selectedColor: AppColors.primaryRed,
+                          backgroundColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
                           ),
-                          Radio<bool>(
-                            value: true,
-                            groupValue: isSelected,
-                            activeColor: AppColors.primaryRed,
-                            onChanged: (_) => storeProvider.selectSlot(slot),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        slot.slotName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      Text(
-                        slot.timeRange,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        slot.feeLabel,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.successGreen,
+                          onSelected: (_) {
+                            setState(() => _selectedSlotDate = dStr);
+                            final firstSlot = slots.firstWhere(
+                              (s) => s.slotDate == dStr,
+                              orElse: () => slots.first,
+                            );
+                            storeProvider.selectSlot(firstSlot);
+                          },
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
+                const SizedBox(height: 14),
+              ],
+
+              // Morning & Evening Slot Cards Grid
+              Row(
+                children: displaySlots.map((slot) {
+                  final isSelected = selectedSlot?.id == slot.id;
+
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => storeProvider.selectSlot(slot),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primaryRed : AppColors.cardBorder,
+                            width: isSelected ? 1.8 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primaryRed.withValues(alpha: 0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Icon(
+                                  slot.slotName == 'Morning'
+                                      ? Icons.wb_sunny_outlined
+                                      : Icons.nightlight_outlined,
+                                  color: isSelected ? AppColors.primaryRed : AppColors.navyDark,
+                                  size: 22,
+                                ),
+                                Radio<String>(
+                                  value: slot.id,
+                                  groupValue: selectedSlot?.id,
+                                  activeColor: AppColors.primaryRed,
+                                  onChanged: (_) => storeProvider.selectSlot(slot),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${slot.slotName} Slot',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              slot.timeRange,
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: slot.isAvailable ? AppColors.successLight : AppColors.warningLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                slot.isAvailable ? slot.feeLabel : 'Fully Booked',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: slot.isAvailable ? AppColors.successGreen : AppColors.warningOrange,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
-            );
-          }).toList(),
-        ),
+            ],
+          );
+        }(),
         const SizedBox(height: 16),
 
         Container(

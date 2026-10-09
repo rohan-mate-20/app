@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -7,7 +7,6 @@ import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
-import '../navigation/main_navigation_shell.dart';
 import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -57,17 +56,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _skipForNow() {
-    context.read<AuthProvider>().continueAsGuest();
-    if (widget.isModal) {
-      Navigator.of(context).pop();
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigationShell()),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -82,30 +70,16 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Skip Row
+                // Top Logo Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const KMartLogo(fontSize: 24),
-                    TextButton(
-                      onPressed: _skipForNow,
-                      child: const Row(
-                        children: [
-                          Text(
-                            'Skip for now',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 20,
-                            color: AppColors.textSecondary,
-                          ),
-                        ],
+                    const KMartLogo(fontSize: 26),
+                    if (widget.isModal || Navigator.of(context).canPop())
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 24, color: AppColors.navyDark),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 20),

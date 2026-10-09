@@ -1,11 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../auth/login_screen.dart';
 import '../location/address_management_screen.dart';
 import '../orders/orders_screen.dart';
 import '../offers/offers_screen.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -33,77 +33,117 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: AppColors.cardBorder),
               ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: AppColors.primaryRedLight,
-                    child: Text(
-                      (customer?.name != null && customer!.name!.isNotEmpty)
-                          ? customer.name!.substring(0, 1).toUpperCase()
-                          : 'K',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryRed,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: isLoggedIn
+                  ? Row(
                       children: [
-                        Text(
-                          customer?.name ?? (isLoggedIn ? 'Customer' : 'Guest Shopper'),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.navyDark,
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: AppColors.primaryRedLight,
+                          child: Text(
+                            (customer?.name != null && customer!.name!.isNotEmpty)
+                                ? customer.name!.substring(0, 1).toUpperCase()
+                                : 'K',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryRed,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isLoggedIn
-                              ? '+91 ${customer?.phone ?? ''}'
-                              : 'Sign in to access your full order history',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (customer?.name != null && customer!.name!.isNotEmpty) ? customer.name! : 'Customer',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.navyDark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                customer?.phone.isNotEmpty == true ? '+91 ${customer!.phone}' : 'Verified K MART Member',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 26,
+                              backgroundColor: AppColors.navyDark.withValues(alpha: 0.08),
+                              child: const Icon(
+                                Icons.person_outline_rounded,
+                                size: 28,
+                                color: AppColors.navyDark,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Welcome to K MART',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.navyDark,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Log in to view addresses & orders',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.login_rounded, size: 18),
+                            label: const Text(
+                              'Sign In with Mobile',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryRed,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginScreen(isModal: true),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  if (!isLoggedIn)
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const LoginScreen(isModal: true),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryRed,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
             ),
             const SizedBox(height: 20),
 

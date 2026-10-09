@@ -1,12 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/kmart_button.dart';
+import '../auth/login_screen.dart';
 import '../checkout/checkout_flow_screen.dart';
 import '../location/location_selector_sheet.dart';
 
@@ -707,11 +709,26 @@ class _CartScreenState extends State<CartScreen> {
                   label: 'Proceed to Checkout',
                   suffixIcon: Icons.arrow_forward_rounded,
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CheckoutFlowScreen(),
-                      ),
-                    );
+                    final authProvider = context.read<AuthProvider>();
+                    if (!authProvider.isLoggedIn) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please log in with your phone number to proceed to checkout'),
+                          backgroundColor: AppColors.primaryRed,
+                        ),
+                      );
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const LoginScreen(),
+                        ),
+                      );
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CheckoutFlowScreen(),
+                        ),
+                      );
+                    }
                   },
                 ),
               ),

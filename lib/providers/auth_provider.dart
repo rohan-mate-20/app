@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/customer_model.dart';
 import '../services/auth_service.dart';
@@ -26,17 +26,16 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> _initializeUser() async {
     _isLoading = true;
-    notifyListeners();
 
     final cached = await _authService.getCachedCustomer();
-    if (cached != null) {
+    if (cached != null && cached.isVerified) {
       _currentCustomer = cached;
-      _isLoggedIn = cached.isVerified;
+      _isLoggedIn = true;
       _phoneNumber = cached.phone;
     } else {
-      // Default to guest user
-      _currentCustomer = await _authService.initGuestUser();
+      _currentCustomer = null;
       _isLoggedIn = false;
+      _phoneNumber = '';
     }
 
     _isLoading = false;
@@ -116,22 +115,15 @@ class AuthProvider with ChangeNotifier {
     _currentCustomer = updated.copyWith(
       dob: dob,
       whatsappOptIn: whatsappOptIn,
+      isVerified: true,
     );
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<void> continueAsGuest() async {
-    if (_currentCustomer == null || _isLoggedIn) {
-      _currentCustomer = await _authService.initGuestUser();
-    }
-    _isLoggedIn = false;
-    notifyListeners();
-  }
-
   Future<void> signOut() async {
     await _authService.signOut();
-    _currentCustomer = await _authService.initGuestUser();
+    _currentCustomer = null;
     _isLoggedIn = false;
     _phoneNumber = '';
     notifyListeners();

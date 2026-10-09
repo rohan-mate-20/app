@@ -1,11 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
-import '../navigation/main_navigation_shell.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String phone;
@@ -59,15 +57,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (!mounted) return;
 
     if (success) {
-      if (widget.isModal) {
-        Navigator.of(context).pop();
-        Navigator.of(context).pop();
-      } else {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationShell()),
-          (route) => false,
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful! Welcome to K MART.'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -205,7 +201,31 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   );
                 }),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 16, color: AppColors.navyDark),
+                    SizedBox(width: 8),
+                    Text(
+                      'Test mode: enter any 6 digits (e.g. 123456) to verify',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.navyDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Resend Row
               Row(

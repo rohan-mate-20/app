@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../auth/login_screen.dart';
 import 'order_tracking_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -46,8 +47,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
           }
         },
         color: AppColors.primaryRed,
-        child: ordersProvider.isLoading
-            ? ListView.separated(
+        child: !context.watch<AuthProvider>().isLoggedIn
+            ? EmptyStateView(
+                title: 'Sign In to View Orders',
+                message: 'Log in with your mobile number to view and track your orders.',
+                icon: Icons.receipt_long_outlined,
+                buttonText: 'Sign In',
+                onButtonPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen(isModal: true)),
+                  );
+                },
+              )
+            : ordersProvider.isLoading
+                ? ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: 4,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),

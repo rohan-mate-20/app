@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/product_model.dart';
 import '../models/category_model.dart';
 import '../services/product_service.dart';

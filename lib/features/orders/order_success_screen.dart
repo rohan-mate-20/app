@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -68,11 +68,11 @@ class OrderSuccessScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Order Confirmed!',
                           style: TextStyle(
                             fontSize: 18,
@@ -80,8 +80,8 @@ class OrderSuccessScreen extends StatelessWidget {
                             color: AppColors.successGreen,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
+                        SizedBox(height: 2),
+                        Text(
                           'Thank you for shopping with K MART.\nYour order has been placed successfully.',
                           style: TextStyle(
                             fontSize: 12,

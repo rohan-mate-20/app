@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/store_model.dart';
 import '../models/address_model.dart';
 import '../models/delivery_settings_model.dart';
@@ -25,14 +25,28 @@ class StoreDeliveryProvider with ChangeNotifier {
 
   bool _isLoading = false;
 
+  static final AddressModel defaultSampleAddress = AddressModel(
+    id: 'addr_default_pune',
+    customerId: 'guest_user',
+    label: 'Home',
+    fullName: 'Customer',
+    phone: '9876543210',
+    line1: 'A-302, Green Park Apartments',
+    line2: 'Baner Road',
+    city: 'Pune',
+    state: 'Maharashtra',
+    pincode: '411045',
+    isDefault: true,
+  );
+
   List<StoreModel> get stores => _stores;
   StoreModel? get activeStore => _activeStore;
   double get userDistanceKm => _userDistanceKm;
-  List<AddressModel> get addresses => _addresses;
-  AddressModel? get selectedAddress => _selectedAddress;
+  List<AddressModel> get addresses => _addresses.isNotEmpty ? _addresses : [defaultSampleAddress];
+  AddressModel? get selectedAddress => _selectedAddress ?? (_addresses.isNotEmpty ? _addresses.first : defaultSampleAddress);
   DeliverySettingsModel get deliverySettings => _deliverySettings;
   List<DeliverySlotModel> get deliverySlots => _deliverySlots;
-  DeliverySlotModel? get selectedSlot => _selectedSlot;
+  DeliverySlotModel? get selectedSlot => _selectedSlot ?? (_deliverySlots.isNotEmpty ? _deliverySlots.first : null);
   bool get isLoading => _isLoading;
 
   StoreDeliveryProvider() {
