@@ -74,8 +74,11 @@ class OrderService {
       debugPrint('[OrderService] Note: Customer table sync: $custErr');
     }
 
-    // 2. Ensure valid address in Supabase
+    // 2. Ensure valid address in Supabase with Store service area coordinates
     String validAddressId = address.id;
+    final double safeLat = (address.latitude != 0.0) ? address.latitude : 18.5300;
+    final double safeLon = (address.longitude != 0.0) ? address.longitude : 73.8700;
+
     if (_isUuid(validAddressId)) {
       // already valid UUID
     } else {
@@ -89,11 +92,11 @@ class OrderService {
               'phone': address.phone,
               'line1': address.line1,
               'line2': address.line2,
-              'city': address.city,
-              'state': address.state,
-              'pincode': address.pincode,
-              'latitude': address.latitude,
-              'longitude': address.longitude,
+              'city': address.city.isNotEmpty ? address.city : 'Pune',
+              'state': address.state.isNotEmpty ? address.state : 'Maharashtra',
+              'pincode': address.pincode.isNotEmpty ? address.pincode : '411001',
+              'latitude': safeLat,
+              'longitude': safeLon,
               'is_default': address.isDefault,
             })
             .select('id')
@@ -125,80 +128,138 @@ class OrderService {
       }
     }
 
-    // 4. Try direct Supabase insertion
+    // 4. Try checkout Edge Function (Official K MART checkout engine)
     String createdOrderId = const Uuid().v4();
     bool savedInSupabase = false;
 
     try {
-      final orderRow = await _supabase
-          .from('orders')
-          .insert({
-            'order_number': orderNumber,
-            'customer_id': resolvedCustId,
-            'store_id': EnvConfig.defaultStoreId,
-            'order_type': 'DELIVERY',
-            'status': 'CONFIRMED',
-            'payment_status': paymentStatus,
-            'payment_method': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
-            'subtotal': subtotal,
-            'delivery_fee': deliveryFee,
-            'total': total,
-            'delivery_slot_id': validSlotId,
-            'scheduled_delivery_date': scheduledDeliveryDate,
-            'delivery_address_snapshot': address.toJson(),
-            'customer_snapshot': customer.toJson(),
-            'idempotency_key': idempotencyKey,
-          })
-          .select()
-          .maybeSingle();
+      // Sync cart and cart_items in Supabase so Edge Function finds them
+      String? dbCartId;
+      try {
+        final cartRes = await _supabase
+            .from('carts')
+            .upsert({'customer_id': resolvedCustId}, onConflict: 'customer_id')
+            .select('id')
+            .maybeSingle();
+        dbCartId = cartRes?['id'] as String?;
+      } catch (_) {}
 
-      if (orderRow != null && orderRow['id'] != null) {
-        createdOrderId = orderRow['id'] as String;
-        savedInSupabase = true;
-        debugPrint('[OrderService] ✅ Order successfully created in Supabase: $createdOrderId');
-
-        // Insert status history
+      if (dbCartId != null && items.isNotEmpty) {
         try {
-          await _supabase.from('order_status_history').insert({
-            'order_id': createdOrderId,
-            'status': 'CONFIRMED',
-            'changed_by': 'K MART System',
-          });
-        } catch (_) {}
-
-        // Insert order items
-        if (items.isNotEmpty) {
-          try {
-            final itemsPayload = items.map((it) => {
-              'order_id': createdOrderId,
+          await _supabase.from('cart_items').upsert(
+            items.map((it) => {
+              'cart_id': dbCartId,
               'product_id': it.product.id,
-              'product_name': it.product.name,
               'quantity': it.quantity,
-              'unit_mrp': it.product.mrp,
-              'unit_selling_price': it.product.sellingPrice,
-              'tax': 0,
-              'line_total': it.lineTotal,
-              'is_available': true,
-            }).toList();
+            }).toList(),
+            onConflict: 'cart_id,product_id',
+          );
+        } catch (_) {}
+      }
 
-            await _supabase.from('order_items').insert(itemsPayload);
-          } catch (_) {}
+      final checkoutPayload = {
+        'customerId': resolvedCustId,
+        'addressId': validAddressId,
+        'orderType': 'DELIVERY',
+        'deliverySlotId': validSlotId,
+        'scheduledDeliveryDate': scheduledDeliveryDate,
+        'paymentMethod': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
+        'idempotencyKey': idempotencyKey,
+      };
+
+      final edgeRes = await _supabase.functions.invoke(
+        'checkout',
+        body: checkoutPayload,
+      );
+
+      if (edgeRes.status == 200 && edgeRes.data != null) {
+        final data = edgeRes.data;
+        if (data is Map && data['order'] != null) {
+          final dbOrder = data['order'];
+          createdOrderId = dbOrder['id']?.toString() ?? createdOrderId;
+          savedInSupabase = true;
+          debugPrint('[OrderService] ✅ Order successfully created via Supabase Edge Function checkout: $createdOrderId');
         }
+      } else {
+        debugPrint('[OrderService] checkout Edge Function response: ${edgeRes.status} ${edgeRes.data}');
+      }
+    } catch (edgeErr) {
+      debugPrint('[OrderService] Note: checkout edge function: $edgeErr');
+    }
 
-        // Insert payment record
-        if (paymentMethod != 'COD' || paymentId != null) {
+    // 5. Fallback: Direct Supabase insertion
+    if (!savedInSupabase) {
+      try {
+        final orderRow = await _supabase
+            .from('orders')
+            .insert({
+              'order_number': orderNumber,
+              'customer_id': resolvedCustId,
+              'store_id': EnvConfig.defaultStoreId,
+              'order_type': 'DELIVERY',
+              'status': 'CONFIRMED',
+              'payment_status': paymentStatus,
+              'payment_method': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
+              'subtotal': subtotal,
+              'delivery_fee': deliveryFee,
+              'total': total,
+              'delivery_slot_id': validSlotId,
+              'scheduled_delivery_date': scheduledDeliveryDate,
+              'delivery_address_snapshot': address.toJson(),
+              'customer_snapshot': customer.toJson(),
+              'idempotency_key': idempotencyKey,
+            })
+            .select()
+            .maybeSingle();
+
+        if (orderRow != null && orderRow['id'] != null) {
+          createdOrderId = orderRow['id'] as String;
+          savedInSupabase = true;
+          debugPrint('[OrderService] ✅ Order successfully created in Supabase: $createdOrderId');
+
+          // Insert status history
           try {
-            await _supabase.from('payments').insert({
+            await _supabase.from('order_status_history').insert({
               'order_id': createdOrderId,
-              'razorpay_payment_id': paymentId,
-              'amount': total,
-              'status': paymentStatus,
+              'status': 'CONFIRMED',
+              'changed_by': 'K MART System',
             });
           } catch (_) {}
+
+          // Insert order items
+          if (items.isNotEmpty) {
+            try {
+              final itemsPayload = items.map((it) => {
+                'order_id': createdOrderId,
+                'product_id': it.product.id,
+                'product_name': it.product.name,
+                'quantity': it.quantity,
+                'unit_mrp': it.product.mrp,
+                'unit_selling_price': it.product.sellingPrice,
+                'tax': 0,
+                'line_total': it.lineTotal,
+                'is_available': true,
+              }).toList();
+
+              await _supabase.from('order_items').insert(itemsPayload);
+            } catch (_) {}
+          }
+
+          // Insert payment record
+          if (paymentMethod != 'COD' || paymentId != null) {
+            try {
+              await _supabase.from('payments').insert({
+                'order_id': createdOrderId,
+                'razorpay_payment_id': paymentId,
+                'amount': total,
+                'status': paymentStatus,
+              });
+            } catch (_) {}
+          }
         }
+      } catch (dbErr) {
+        debugPrint('[OrderService] Supabase DB note (RLS policy check): $dbErr');
       }
-    } catch (dbErr) {
-      debugPrint('[OrderService] Supabase DB note (RLS policy check): $dbErr');
     }
 
     final finalOrder = OrderModel(
