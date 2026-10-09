@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
 import 'supabase_service.dart';
@@ -96,6 +96,28 @@ class CartService {
       await _supabase.from('cart_items').delete().eq('cart_id', cartId);
     } catch (e) {
       debugPrint('[CartService] clearCart error: $e');
+    }
+  }
+
+  /// Synchronize all local cart items to the database cart_items table
+  Future<void> syncCartToDatabase({
+    required String cartId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    if (cartId.isEmpty) return;
+    try {
+      await _supabase.from('cart_items').delete().eq('cart_id', cartId);
+      if (items.isEmpty) return;
+      final rows = items
+          .map((item) => {
+                'cart_id': cartId,
+                'product_id': item['productId'],
+                'quantity': item['quantity'],
+              })
+          .toList();
+      await _supabase.from('cart_items').insert(rows);
+    } catch (e) {
+      debugPrint('[CartService] syncCartToDatabase note: $e');
     }
   }
 }

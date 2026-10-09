@@ -8,9 +8,13 @@ import '../models/cart_item_model.dart';
 import '../models/address_model.dart';
 import '../models/customer_model.dart';
 import 'supabase_service.dart';
+import 'cart_service.dart';
+import 'checkout_service.dart';
 
 class OrderService {
   final _supabase = SupabaseService.client;
+  final _cartService = CartService();
+  final _checkoutService = CheckoutService();
   static const String _prefKeyLocalOrders = 'kmart_local_cached_orders';
 
   /// Check if a string is a valid UUID
@@ -35,7 +39,7 @@ class OrderService {
     String? scheduledDeliveryDate,
     String? paymentId,
   }) async {
-    final orderNumber = 'KM${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    String orderNumber = 'KM${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
     final idempotencyKey = const Uuid().v4();
     final paymentStatus = paymentMethod == 'COD' ? 'PENDING' : 'PAID';
 
@@ -133,55 +137,39 @@ class OrderService {
     bool savedInSupabase = false;
 
     try {
-      // Sync cart and cart_items in Supabase so Edge Function finds them
-      String? dbCartId;
-      try {
-        final cartRes = await _supabase
-            .from('carts')
-            .upsert({'customer_id': resolvedCustId}, onConflict: 'customer_id')
-            .select('id')
-            .maybeSingle();
-        dbCartId = cartRes?['id'] as String?;
-      } catch (_) {}
-
+      // Step 3: Sync Cart to DB (carts & cart_items tables)
+      final dbCartId = await _cartService.getOrCreateCartId(resolvedCustId);
       if (dbCartId != null && items.isNotEmpty) {
-        try {
-          await _supabase.from('cart_items').upsert(
-            items.map((it) => {
-              'cart_id': dbCartId,
-              'product_id': it.product.id,
-              'quantity': it.quantity,
-            }).toList(),
-            onConflict: 'cart_id,product_id',
-          );
-        } catch (_) {}
+        await _cartService.syncCartToDatabase(
+          cartId: dbCartId,
+          items: items
+              .map((it) => {
+                    'productId': it.product.id,
+                    'quantity': it.quantity,
+                  })
+              .toList(),
+        );
       }
 
-      final checkoutPayload = {
-        'customerId': resolvedCustId,
-        'addressId': validAddressId,
-        'orderType': 'DELIVERY',
-        'deliverySlotId': validSlotId,
-        'scheduledDeliveryDate': scheduledDeliveryDate,
-        'paymentMethod': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
-        'idempotencyKey': idempotencyKey,
-      };
-
-      final edgeRes = await _supabase.functions.invoke(
-        'checkout',
-        body: checkoutPayload,
+      // Step 4: Call Edge Function via CheckoutService
+      final edgeData = await _checkoutService.placeOrder(
+        customerId: resolvedCustId,
+        orderType: 'DELIVERY',
+        addressId: validAddressId,
+        deliverySlotId: validSlotId,
+        scheduledDate: scheduledDeliveryDate,
+        paymentMethod: paymentMethod == 'COD' ? 'COD' : 'ONLINE',
+        idempotencyKey: idempotencyKey,
       );
 
-      if (edgeRes.status == 200 && edgeRes.data != null) {
-        final data = edgeRes.data;
-        if (data is Map && data['order'] != null) {
-          final dbOrder = data['order'];
-          createdOrderId = dbOrder['id']?.toString() ?? createdOrderId;
-          savedInSupabase = true;
-          debugPrint('[OrderService] ✅ Order successfully created via Supabase Edge Function checkout: $createdOrderId');
+      if (edgeData['order'] != null) {
+        final dbOrder = edgeData['order'];
+        createdOrderId = dbOrder['id']?.toString() ?? createdOrderId;
+        if (dbOrder['order_number'] != null) {
+          orderNumber = dbOrder['order_number'].toString();
         }
-      } else {
-        debugPrint('[OrderService] checkout Edge Function response: ${edgeRes.status} ${edgeRes.data}');
+        savedInSupabase = true;
+        debugPrint('[OrderService] ✅ Order successfully created via Supabase Edge Function checkout: $createdOrderId (#$orderNumber)');
       }
     } catch (edgeErr) {
       debugPrint('[OrderService] Note: checkout edge function: $edgeErr');
