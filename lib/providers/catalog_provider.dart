@@ -42,7 +42,7 @@ class CatalogProvider with ChangeNotifier {
 
     try {
       final results = await Future.wait([
-        _productService.fetchProducts(storeId: storeId),
+        _productService.fetchProducts(storeId: storeId, limit: 100),
         _productService.fetchCategories(),
       ]);
 
@@ -53,6 +53,36 @@ class CatalogProvider with ChangeNotifier {
       _errorMessage = 'Failed to load products. Please check your connection.';
       _isLoading = false;
     }
+    notifyListeners();
+  }
+
+  bool _isFetchingMore = false;
+  bool get isFetchingMore => _isFetchingMore;
+
+  Future<void> loadMoreProducts({String? storeId, String? categoryId}) async {
+    if (_isFetchingMore || _isLoading) return;
+    _isFetchingMore = true;
+    notifyListeners();
+
+    try {
+      final moreProducts = await _productService.fetchProducts(
+        storeId: storeId,
+        categoryId: categoryId,
+        limit: 100,
+        offset: _allProducts.length,
+      );
+
+      if (moreProducts.isNotEmpty) {
+        // Prevent duplicates
+        final existingIds = _allProducts.map((p) => p.id).toSet();
+        final newProducts = moreProducts.where((p) => !existingIds.contains(p.id)).toList();
+        _allProducts.addAll(newProducts);
+      }
+    } catch (e) {
+      debugPrint('[CatalogProvider] loadMoreProducts error: $e');
+    }
+
+    _isFetchingMore = false;
     notifyListeners();
   }
 

@@ -6,19 +6,30 @@ import 'supabase_service.dart';
 class ProductService {
   final _supabase = SupabaseService.client;
 
-  /// Fetch all active products joined with categories and inventory
-  Future<List<ProductModel>> fetchProducts({String? storeId}) async {
+  /// Fetch active products with optional pagination and category filtering
+  Future<List<ProductModel>> fetchProducts({
+    String? storeId,
+    String? categoryId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
     try {
-      final response = await _supabase
+      var query = _supabase
           .from('products')
           .select('''
             *,
             categories ( id, name ),
             inventory ( store_id, stock_quantity )
           ''')
-          .eq('active', true)
+          .eq('active', true);
+
+      if (categoryId != null && categoryId.isNotEmpty) {
+        query = query.eq('category_id', categoryId);
+      }
+
+      final response = await query
           .order('name', ascending: true)
-          .limit(1000);
+          .range(offset, offset + limit - 1);
 
       final list = response as List;
       return list

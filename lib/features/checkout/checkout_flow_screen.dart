@@ -125,8 +125,8 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     );
     final settings = storeProvider.deliverySettings;
     final subtotal = cartProvider.itemTotal;
-    final delFee = cartProvider.calculateDeliveryFee(settings);
-    final total = cartProvider.calculateGrandTotal(settings);
+    final delFee = cartProvider.calculateDeliveryFee();
+    final total = cartProvider.calculateGrandTotal();
     final slot = storeProvider.selectedSlot;
 
     if (_paymentMethod == 'COD') {
@@ -195,9 +195,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     final storeProvider = context.watch<StoreDeliveryProvider>();
     final ordersProvider = context.watch<OrdersProvider>();
 
-    final totalAmount = cartProvider.calculateGrandTotal(
-      storeProvider.deliverySettings,
-    );
+    final totalAmount = cartProvider.calculateGrandTotal();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -819,8 +817,8 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     final address = storeProvider.selectedAddress;
     final slot = storeProvider.selectedSlot;
     final settings = storeProvider.deliverySettings;
-    final delFee = cartProvider.calculateDeliveryFee(settings);
-    final totalAmount = cartProvider.calculateGrandTotal(settings);
+    final delFee = cartProvider.calculateDeliveryFee();
+    final totalAmount = cartProvider.calculateGrandTotal();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1082,7 +1080,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     StoreDeliveryProvider storeProvider,
   ) {
     final settings = storeProvider.deliverySettings;
-    final totalAmount = cartProvider.calculateGrandTotal(settings);
+    final totalAmount = cartProvider.calculateGrandTotal();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1262,8 +1260,8 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
               const SizedBox(height: 6),
               _buildBillRow(
                 'Delivery Fee',
-                cartProvider.calculateDeliveryFee(settings) == 0 ? 'FREE' : '₹40',
-                valueColor: AppColors.successGreen,
+                cartProvider.calculateDeliveryFee() == 0 ? 'FREE' : CurrencyFormatter.format(cartProvider.calculateDeliveryFee()),
+                valueColor: cartProvider.calculateDeliveryFee() == 0 ? AppColors.successGreen : AppColors.textPrimary,
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),

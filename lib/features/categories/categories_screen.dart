@@ -112,47 +112,59 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
           // Product Grid
           Expanded(
-            child: catalogProvider.isLoading
-                ? GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.64,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: 6,
-                    itemBuilder: (_, __) => const SkeletonLoader(
-                      width: 160,
-                      height: 240,
-                      borderRadius: 16,
-                    ),
-                  )
-                : products.isEmpty
-                    ? EmptyStateView(
-                        title: 'No products found',
-                        message:
-                            'No items available under this category currently.',
-                        buttonText: 'View All Products',
-                        onButtonPressed: () {
-                          catalogProvider.selectCategory('all');
-                        },
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.62,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          return ProductCard(product: products[index]);
-                        },
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (ScrollNotification scrollInfo) {
+                if (!catalogProvider.isLoading &&
+                    !catalogProvider.isFetchingMore &&
+                    scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
+                  // Fetch more when near the bottom
+                  catalogProvider.loadMoreProducts(
+                    categoryId: catalogProvider.selectedCategorySlug == 'all'
+                        ? null
+                        : categories.firstWhere((c) => c.slug == catalogProvider.selectedCategorySlug, orElse: () => categories.first).id,
+                  );
+                }
+                return false;
+              },
+              child: catalogProvider.isLoading
+                  ? GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.64,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                       ),
+                      itemCount: 6,
+                      itemBuilder: (_, __) => const SkeletonLoader(
+                        width: 160,
+                        height: 240,
+                        borderRadius: 16,
+                      ),
+                    )
+                  : products.isEmpty
+                      ? EmptyStateView(
+                          title: 'No products found',
+                          message: 'No items available under this category currently.',
+                          buttonText: 'View All Products',
+                          onButtonPressed: () {
+                            catalogProvider.selectCategory('all');
+                          },
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.62,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                          itemCount: products.length,
+                          itemBuilder: (context, index) {
+                            return ProductCard(product: products[index]);
+                          },
+                        ),
+            ),
           ),
         ],
       ),

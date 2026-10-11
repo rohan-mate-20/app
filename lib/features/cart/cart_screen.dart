@@ -194,8 +194,8 @@ class _CartScreenState extends State<CartScreen> {
       );
     }
 
-    final delFee = cartProvider.calculateDeliveryFee(settings);
-    final totalAmount = cartProvider.calculateGrandTotal(settings);
+    final delFee = cartProvider.calculateDeliveryFee();
+    final totalAmount = cartProvider.calculateGrandTotal();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -615,7 +615,31 @@ class _CartScreenState extends State<CartScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Free delivery banner / Store location
+            // Minimum Order / Free Delivery Banner
+            if (cartProvider.itemTotal < 500)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warningLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.warningOrange.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: AppColors.warningOrange),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Minimum order value is ₹500. Add items worth ${CurrencyFormatter.format(500 - cartProvider.itemTotal)} more to proceed.',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Delivery Banner
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -706,13 +730,15 @@ class _CartScreenState extends State<CartScreen> {
                 child: KMartButton(
                   label: 'Proceed to Checkout',
                   suffixIcon: Icons.arrow_forward_rounded,
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CheckoutFlowScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: cartProvider.itemTotal < 500
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const CheckoutFlowScreen(),
+                            ),
+                          );
+                        },
                 ),
               ),
             ],

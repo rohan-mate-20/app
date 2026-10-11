@@ -1,7 +1,7 @@
 ﻿import 'package:flutter/foundation.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
-import '../models/delivery_settings_model.dart';
+
 import '../services/cart_service.dart';
 
 class CartProvider with ChangeNotifier {
@@ -30,16 +30,17 @@ class CartProvider with ChangeNotifier {
   double get totalSavings => (mrpTotal - itemTotal) + _couponDiscount;
 
   /// Calculate Delivery Fee dynamically
-  double calculateDeliveryFee(DeliverySettingsModel settings, {int pastOrderCount = 0}) {
+  double calculateDeliveryFee() {
     if (isEmpty) return 0.0;
-    if (itemTotal >= 2000) return 0.0;
-    return settings.calculateFee(itemTotal, pastOrderCount);
+    if (itemTotal < 500) return 0.0; // Handled in UI as un-checkout-able
+    if (itemTotal < 1000) return 40.0;
+    return 70.0; // >= 1000 is 70 total
   }
 
   /// Grand total
-  double calculateGrandTotal(DeliverySettingsModel settings, {int pastOrderCount = 0}) {
+  double calculateGrandTotal() {
     if (isEmpty) return 0.0;
-    final delFee = calculateDeliveryFee(settings, pastOrderCount: pastOrderCount);
+    final delFee = calculateDeliveryFee();
     final total = itemTotal + delFee - _couponDiscount;
     return total > 0 ? total : 0.0;
   }
