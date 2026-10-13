@@ -11,8 +11,13 @@ import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool isModal;
+  final bool redirectToCheckout;
 
-  const LoginScreen({super.key, this.isModal = false});
+  const LoginScreen({
+    super.key,
+    this.isModal = false,
+    this.redirectToCheckout = false,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -43,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => OtpVerificationScreen(
             phone: phone,
             isModal: widget.isModal,
+            redirectToCheckout: widget.redirectToCheckout,
           ),
         ),
       );
@@ -134,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             fit: BoxFit.cover,
                             width: 220,
                             errorWidget: (context, url, error) => Container(
-                              color: AppColors.primaryRed.withOpacity(0.2),
+                              color: AppColors.primaryRed.withValues(alpha: 0.2),
                             ),
                           ),
                         ),

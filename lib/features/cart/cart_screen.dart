@@ -3,10 +3,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
-import '../../providers/store_delivery_provider.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/kmart_button.dart';
+import '../auth/login_screen.dart';
 import '../checkout/checkout_flow_screen.dart';
 import '../location/location_selector_sheet.dart';
 
@@ -18,167 +19,9 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final TextEditingController _couponController = TextEditingController();
-
-  @override
-  void dispose() {
-    _couponController.dispose();
-    super.dispose();
-  }
-
-  void _showCouponModal() {
-    final cartProvider = context.read<CartProvider>();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Apply Coupon Code',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.navyDark,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _couponController,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter coupon code',
-                        prefixIcon: Icon(Icons.confirmation_number_outlined),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: () {
-                      final code = _couponController.text.trim();
-                      if (code.isEmpty) return;
-                      final res = cartProvider.applyCoupon(code);
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(res['message']),
-                          backgroundColor: res['success']
-                              ? AppColors.successGreen
-                              : AppColors.primaryRed,
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryRed,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                    ),
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Available Coupons',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              _buildCouponPill('KMART50', 'Get ₹50 OFF on orders above ₹250', () {
-                _couponController.text = 'KMART50';
-              }),
-              _buildCouponPill('WELCOME10', 'Flat 10% OFF on all grocery items', () {
-                _couponController.text = 'WELCOME10';
-              }),
-              _buildCouponPill('FREEDEL', 'Free Delivery on any order value', () {
-                _couponController.text = 'FREEDEL';
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCouponPill(String code, String desc, VoidCallback onSelect) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primaryRedLight,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              code,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryRed,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              desc,
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-          ),
-          TextButton(
-            onPressed: onSelect,
-            child: const Text(
-              'USE',
-              style: TextStyle(
-                color: AppColors.navyDark,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cartProvider = context.watch<CartProvider>();
-    final storeProvider = context.watch<StoreDeliveryProvider>();
-    final settings = storeProvider.deliverySettings;
 
     if (cartProvider.isEmpty) {
       return Scaffold(
@@ -188,7 +31,7 @@ class _CartScreenState extends State<CartScreen> {
           message: 'Explore our wide range of groceries and essentials!',
           buttonText: 'Start Shopping',
           onButtonPressed: () {
-            // Switch tab to categories or home
+            Navigator.of(context).popUntil((route) => route.isFirst);
           },
         ),
       );
@@ -271,56 +114,6 @@ class _CartScreenState extends State<CartScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Savings announcement banner
-            if (cartProvider.totalSavings > 0) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.successLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.successGreen.withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.percent_rounded,
-                      color: AppColors.successGreen,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: RichText(
-                        text: TextSpan(
-                          text: "You're saving ",
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 13,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: CurrencyFormatter.format(
-                                cartProvider.totalSavings,
-                              ),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.successGreen,
-                              ),
-                            ),
-                            const TextSpan(
-                              text: ' on this order! Keep shopping for more.',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
             // Cart Items List
             ListView.separated(
               shrinkWrap: true,
@@ -383,39 +176,15 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  CurrencyFormatter.format(
-                                    product.sellingPrice,
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.navyDark,
-                                  ),
-                                ),
-                                if (product.mrp > product.sellingPrice) ...[
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    CurrencyFormatter.format(product.mrp),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textMuted,
-                                      decoration: TextDecoration.lineThrough,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${product.discountPercent}% OFF',
-                                    style: const TextStyle(
-                                      color: AppColors.successGreen,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            Text(
+                              CurrencyFormatter.format(
+                                product.sellingPrice,
+                              ),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.navyDark,
+                              ),
                             ),
                           ],
                         ),
@@ -494,59 +263,6 @@ class _CartScreenState extends State<CartScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Coupon Code Card
-            InkWell(
-              onTap: _showCouponModal,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.discount_outlined,
-                      color: AppColors.primaryRed,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        cartProvider.appliedCoupon != null
-                            ? 'Coupon Applied: ${cartProvider.appliedCoupon} (₹${cartProvider.couponDiscount.toInt()} OFF)'
-                            : 'Apply Coupon Code',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: cartProvider.appliedCoupon != null
-                              ? AppColors.successGreen
-                              : AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (cartProvider.appliedCoupon != null)
-                      GestureDetector(
-                        onTap: () => cartProvider.removeCoupon(),
-                        child: const Icon(
-                          Icons.cancel_outlined,
-                          size: 18,
-                          color: AppColors.primaryRed,
-                        ),
-                      )
-                    else
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.textSecondary,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // Bill Details Card
             Container(
               padding: const EdgeInsets.all(16),
@@ -571,19 +287,21 @@ class _CartScreenState extends State<CartScreen> {
                     'Item Total (${cartProvider.itemCount} items)',
                     CurrencyFormatter.format(cartProvider.itemTotal),
                   ),
-                  if (cartProvider.totalSavings > 0) ...[
-                    const SizedBox(height: 8),
-                    _buildBillRow(
-                      'Discount Savings',
-                      '-${CurrencyFormatter.format(cartProvider.totalSavings)}',
-                      valueColor: AppColors.successGreen,
-                    ),
-                  ],
                   const SizedBox(height: 8),
                   _buildBillRow(
                     'Delivery Fee',
                     delFee == 0 ? 'FREE' : CurrencyFormatter.format(delFee),
                     valueColor: delFee == 0 ? AppColors.successGreen : null,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBillRow(
+                    'Handling Fee',
+                    CurrencyFormatter.format(cartProvider.handlingFee),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBillRow(
+                    'Platform Fee',
+                    CurrencyFormatter.format(cartProvider.platformFee),
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 10),
@@ -615,7 +333,7 @@ class _CartScreenState extends State<CartScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Minimum Order / Free Delivery Banner
+            // Minimum Order Banner
             if (cartProvider.itemTotal < 500)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -639,7 +357,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
 
-            // Delivery Banner
+            // Delivery Location Banner
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -649,14 +367,14 @@ class _CartScreenState extends State<CartScreen> {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.local_shipping_outlined,
+                    Icons.location_on_outlined,
                     color: AppColors.navyDark,
                     size: 20,
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      'Yay! You get FREE delivery\nYour location is 2.4 km from K MART',
+                      'Delivery Location\n2.4 km from K MART store',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.navyDark,
@@ -694,7 +412,7 @@ class _CartScreenState extends State<CartScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -733,11 +451,26 @@ class _CartScreenState extends State<CartScreen> {
                   onPressed: cartProvider.itemTotal < 500
                       ? null
                       : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const CheckoutFlowScreen(),
-                            ),
-                          );
+                          final authProvider = context.read<AuthProvider>();
+                          if (!authProvider.isLoggedIn) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please log in with your mobile number to proceed to checkout'),
+                                backgroundColor: AppColors.primaryRed,
+                              ),
+                            );
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(redirectToCheckout: true),
+                              ),
+                            );
+                          } else {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const CheckoutFlowScreen(),
+                              ),
+                            );
+                          }
                         },
                 ),
               ),

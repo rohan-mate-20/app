@@ -8,11 +8,12 @@ import '../../providers/catalog_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../../widgets/kmart_logo.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/need_help_faq_sheet.dart';
 import '../categories/categories_screen.dart';
 import '../location/location_selector_sheet.dart';
-import '../offers/offers_screen.dart';
 import '../products/product_card.dart';
 import '../search/search_screen.dart';
+import '../auth/login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,15 @@ class HomeScreen extends StatelessWidget {
     final catalogProvider = context.watch<CatalogProvider>();
     final storeProvider = context.watch<StoreDeliveryProvider>();
     final authProvider = context.watch<AuthProvider>();
+
+    // Hide Fruits and Vegetables categories from Home Page category section
+    final homeCategories = catalogProvider.categories.where((cat) {
+      final nameLower = cat.name.toLowerCase();
+      final slugLower = cat.slug.toLowerCase();
+      final isFruits = nameLower.contains('fruit') || slugLower.contains('fruit');
+      final isVeg = nameLower.contains('veg') || slugLower.contains('veg');
+      return !isFruits && !isVeg;
+    }).toList();
     final currentAddress = storeProvider.selectedAddress;
 
     return Scaffold(
@@ -33,48 +43,75 @@ class HomeScreen extends StatelessWidget {
           children: [
             const KMartLogo(fontSize: 18, showTagline: false),
             const SizedBox(height: 2),
-            InkWell(
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => const LocationSelectorSheet(),
-                );
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.location_on,
-                    size: 14,
-                    color: AppColors.primaryRed,
-                  ),
-                  const SizedBox(width: 4),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.52,
+            if (authProvider.isLoggedIn)
+              InkWell(
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => const LocationSelectorSheet(),
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      size: 14,
+                      color: AppColors.primaryRed,
                     ),
-                    child: Text(
-                      currentAddress != null
-                          ? '${currentAddress.label} - ${currentAddress.line1}, ${currentAddress.city}'
-                          : 'Deliver to Home - 123, Green Park, Pune 411001',
-                      style: const TextStyle(
+                    const SizedBox(width: 4),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.52,
+                      ),
+                      child: Text(
+                        currentAddress != null
+                            ? '${currentAddress.label} - ${currentAddress.line1}, ${currentAddress.city}'
+                            : 'Select Delivery Location',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              )
+            else
+              GestureDetector(
+                onTap: () {
+                  // If not logged in, prompt user to login
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
+                },
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      size: 14,
+                      color: AppColors.primaryRed,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Login to select address',
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
         actions: [
@@ -171,99 +208,125 @@ class HomeScreen extends StatelessWidget {
               // Promotional Banner Carousel
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  height: 170,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: AppColors.navyDark,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Background Image
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 170,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.horizontal(
-                            right: Radius.circular(20),
-                          ),
-                          child: CachedNetworkImage(
-                            imageUrl: AppConstants.bannerFreshEssentials,
-                            fit: BoxFit.cover,
-                            errorWidget: (context, url, error) => Container(
-                              color: AppColors.primaryRed.withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    // Scale banner height up to 170 on mobile, slightly larger on wide screens, keeping aspect ratio roughly 2.2:1
+                    final height = width > 500 ? 200.0 : (width * 0.45).clamp(140.0, 170.0);
+                    return Container(
+                      height: height,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.navyDark,
+                        borderRadius: BorderRadius.circular(20),
                       ),
+                      child: Stack(
+                        children: [
+                          // Background Image - Positioned appropriately for mobile vs desktop
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: width * 0.45,
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.horizontal(
+                                right: Radius.circular(20),
+                              ),
+                              child: CachedNetworkImage(
+                                imageUrl: AppConstants.bannerFreshEssentials,
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => Container(
+                                  color: AppColors.primaryRed.withValues(alpha: 0.3),
+                                ),
+                              ),
+                            ),
+                          ),
 
-                      // Text Content
-                      Padding(
-                        padding: const EdgeInsets.all(18.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'Everything you need,\nRight at your doorstep.',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                height: 1.15,
+                          // Gradient Overlay to ensure text readability even if image bleeds
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.navyDark,
+                                    AppColors.navyDark.withValues(alpha: 0.8),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.0, 0.45, 1.0],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Fresh groceries. Daily essentials.\nHappier homes.',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const CategoriesScreen(),
+                          ),
+
+                          // Text Content
+                          Padding(
+                            padding: const EdgeInsets.all(18.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Everything you need,\nRight at your doorstep.',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: width > 350 ? 18 : 16,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.15,
                                   ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryRed,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Fresh groceries. Daily essentials.\nHappier homes.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Shop Now',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
+                                const Spacer(),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const CategoriesScreen(),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryRed,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  SizedBox(width: 4),
-                                  Icon(Icons.arrow_forward, size: 14),
-                                ],
-                              ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Shop Now',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Icon(Icons.arrow_forward, size: 14),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  }
                 ),
               ),
               const SizedBox(height: 20),
@@ -335,10 +398,10 @@ class HomeScreen extends StatelessWidget {
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
-                    itemCount: catalogProvider.categories.length,
+                    itemCount: homeCategories.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 14),
                     itemBuilder: (context, index) {
-                      final cat = catalogProvider.categories[index];
+                      final cat = homeCategories[index];
                       return GestureDetector(
                         onTap: () {
                           catalogProvider.selectCategory(cat.slug);
@@ -355,7 +418,6 @@ class HomeScreen extends StatelessWidget {
                             Container(
                               height: 64,
                               width: 64,
-                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
@@ -367,12 +429,14 @@ class HomeScreen extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              child: CachedNetworkImage(
-                                imageUrl: cat.iconUrl,
-                                fit: BoxFit.contain,
-                                errorWidget: (_, __, ___) => const Icon(
-                                  Icons.category_outlined,
-                                  color: AppColors.primaryRed,
+                              child: ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: cat.iconUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => const Icon(
+                                    Icons.category_outlined,
+                                    color: AppColors.primaryRed,
+                                  ),
                                 ),
                               ),
                             ),
@@ -548,12 +612,12 @@ class HomeScreen extends StatelessWidget {
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   scrollDirection: Axis.horizontal,
-                  itemCount: catalogProvider.categories.length + 1,
+                  itemCount: homeCategories.length + 1,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final isAll = index == 0;
-                    final slug = isAll ? 'all' : catalogProvider.categories[index - 1].slug;
-                    final name = isAll ? 'All Items' : catalogProvider.categories[index - 1].name;
+                    final slug = isAll ? 'all' : homeCategories[index - 1].slug;
+                    final name = isAll ? 'All Items' : homeCategories[index - 1].name;
                     final isSelected = catalogProvider.selectedCategorySlug == slug;
 
                     return ChoiceChip(
@@ -645,97 +709,7 @@ class HomeScreen extends StatelessWidget {
                         },
                       ),
               ),
-              const SizedBox(height: 28),
-
-              // Great Deals Every Day Card
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryRedLight,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.primaryRed.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primaryRed,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.percent_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Great Deals\nEvery Day',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primaryRed,
-                                height: 1.1,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Save more on your daily essentials',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      OutlinedButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const OffersScreen(),
-                            ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryRed,
-                          side: const BorderSide(color: AppColors.primaryRed),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Text(
-                              'View Offers',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(width: 4),
-                            Icon(Icons.arrow_forward, size: 14),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Trust Badges Grid
               Padding(
@@ -760,10 +734,13 @@ class HomeScreen extends StatelessWidget {
                         'Quality Items',
                         'Trusted brands',
                       ),
-                      _buildTrustBadge(
-                        Icons.headset_mic_outlined,
-                        'Need Help?',
-                        'Instant support',
+                      GestureDetector(
+                        onTap: () => NeedHelpFaqSheet.show(context),
+                        child: _buildTrustBadge(
+                          Icons.headset_mic_outlined,
+                          'Need Help?',
+                          'Instant support',
+                        ),
                       ),
                     ],
                   ),

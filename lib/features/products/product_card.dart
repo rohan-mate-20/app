@@ -45,10 +45,9 @@ class ProductCard extends StatelessWidget {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.all(10.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.max,
               children: [
                 // Top Row: Discount Badge + Wishlist Heart
                 Stack(
@@ -57,7 +56,7 @@ class ProductCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        height: 110,
+                        height: 95,
                         width: double.infinity,
                         color: AppColors.background,
                         child: CachedNetworkImage(
@@ -65,8 +64,8 @@ class ProductCard extends StatelessWidget {
                           fit: BoxFit.contain,
                           placeholder: (context, url) => Center(
                             child: SizedBox(
-                              height: 24,
-                              width: 24,
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: AppColors.primaryRed.withValues(alpha: 0.5),
@@ -75,7 +74,7 @@ class ProductCard extends StatelessWidget {
                           ),
                           errorWidget: (context, url, error) => const Icon(
                             Icons.shopping_bag_outlined,
-                            size: 40,
+                            size: 36,
                             color: AppColors.textMuted,
                           ),
                         ),
@@ -89,8 +88,8 @@ class ProductCard extends StatelessWidget {
                         left: 4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 3,
+                            horizontal: 5,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primaryRed,
@@ -100,7 +99,7 @@ class ProductCard extends StatelessWidget {
                             '${product.discountPercent}% OFF',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 10,
+                              fontSize: 9,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -125,7 +124,7 @@ class ProductCard extends StatelessWidget {
                             isWishlisted
                                 ? Icons.favorite_rounded
                                 : Icons.favorite_border_rounded,
-                            size: 16,
+                            size: 15,
                             color: isWishlisted
                                 ? AppColors.primaryRed
                                 : AppColors.textMuted,
@@ -135,9 +134,9 @@ class ProductCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
 
-                // Product Name (Expanded to push price & button to bottom)
+                // Product Name + Weight
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,25 +146,25 @@ class ProductCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
-                          height: 1.2,
+                          height: 1.15,
                         ),
                       ),
                       const SizedBox(height: 2),
-                      // Weight Unit / Size
                       Text(
                         '(${product.weightUnit})',
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: AppColors.textSecondary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
 
                 // Price Row
                 Row(
@@ -175,7 +174,7 @@ class ProductCard extends StatelessWidget {
                     Text(
                       CurrencyFormatter.format(product.sellingPrice),
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
@@ -185,7 +184,7 @@ class ProductCard extends StatelessWidget {
                       Text(
                         CurrencyFormatter.format(product.mrp),
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: AppColors.textMuted,
                           decoration: TextDecoration.lineThrough,
                         ),
@@ -193,12 +192,12 @@ class ProductCard extends StatelessWidget {
                     ],
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
 
                 // Add / Stepper Button
                 if (currentQty == 0)
                   SizedBox(
-                    height: 34,
+                    height: 32,
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () {
@@ -221,19 +220,19 @@ class ProductCard extends StatelessWidget {
                           Text(
                             'Add',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           SizedBox(width: 4),
-                          Icon(Icons.add_rounded, size: 16),
+                          Icon(Icons.add_rounded, size: 15),
                         ],
                       ),
                     ),
                   )
                 else
                   Container(
-                    height: 34,
+                    height: 32,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: AppColors.primaryRed,
@@ -245,7 +244,7 @@ class ProductCard extends StatelessWidget {
                         IconButton(
                           icon: const Icon(
                             Icons.remove_rounded,
-                            size: 16,
+                            size: 15,
                             color: Colors.white,
                           ),
                           padding: EdgeInsets.zero,
@@ -261,14 +260,14 @@ class ProductCard extends StatelessWidget {
                           '$currentQty',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         IconButton(
                           icon: const Icon(
                             Icons.add_rounded,
-                            size: 16,
+                            size: 15,
                             color: Colors.white,
                           ),
                           padding: EdgeInsets.zero,

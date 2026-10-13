@@ -1,4 +1,4 @@
-﻿class DeliverySettingsModel {
+class DeliverySettingsModel {
   final int id;
   final double minOrderValue;
   final double tier1MaxValue;
@@ -27,16 +27,16 @@
     );
   }
 
-  double calculateFee(double subtotal, int pastOrderCount) {
+  double calculateFee(double subtotal, int pastOrderCount, {bool isPickup = false}) {
+    if (isPickup) {
+      return 0.0;
+    }
     if (pastOrderCount < freeDeliveryOrderCount) {
       return 0.0;
     }
-    if (subtotal >= 2000) {
-      return 0.0;
+    if (subtotal >= 1000.0) {
+      return tier2Fee; // 30.0
     }
-    if (subtotal <= tier1MaxValue) {
-      return tier1Fee;
-    }
-    return tier2Fee;
+    return tier1Fee; // 40.0
   }
 }

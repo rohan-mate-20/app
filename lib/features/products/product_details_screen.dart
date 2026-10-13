@@ -4,10 +4,14 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/product_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
+import '../../services/product_service.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../auth/login_screen.dart';
 import '../checkout/checkout_flow_screen.dart';
 import 'product_card.dart';
 
@@ -25,6 +29,55 @@ class ProductDetailsScreen extends StatefulWidget {
 
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   int _selectedQuantity = 1;
+  List<ProductModel> _relatedProducts = [];
+  bool _isLoadingRelated = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRelatedProducts();
+  }
+
+  Future<void> _loadRelatedProducts() async {
+    try {
+      final productService = ProductService();
+      
+      // 1. Fetch products from the same category
+      List<ProductModel> categoryItems = await productService.fetchProducts(
+        categoryId: widget.product.categoryId,
+        limit: 20,
+      );
+
+      // Filter out the current viewing product
+      categoryItems = categoryItems.where((p) => p.id != widget.product.id).toList();
+
+      // 2. If fewer than 15 items in category, fetch extra items from catalog
+      if (categoryItems.length < 15) {
+        final extraItems = await productService.fetchProducts(limit: 25);
+        final existingIds = categoryItems.map((p) => p.id).toSet();
+        existingIds.add(widget.product.id);
+
+        for (final item in extraItems) {
+          if (!existingIds.contains(item.id)) {
+            categoryItems.add(item);
+            existingIds.add(item.id);
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _relatedProducts = categoryItems.take(20).toList();
+          _isLoadingRelated = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[ProductDetailsScreen] Error loading related products: $e');
+      if (mounted) {
+        setState(() => _isLoadingRelated = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,11 +85,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final cartProvider = context.watch<CartProvider>();
     final catalogProvider = context.watch<CatalogProvider>();
     final isWishlisted = catalogProvider.isWishlisted(product.id);
-
-    final relatedProducts = catalogProvider.allProducts
-        .where((p) => p.id != product.id)
-        .take(4)
-        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -183,7 +231,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           border: Border.all(color: AppColors.cardBorder),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 6,
                             ),
                           ],
@@ -247,7 +295,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.starGold.withOpacity(0.15),
+                          color: AppColors.starGold.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -442,11 +490,26 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         product,
                         quantity: _selectedQuantity,
                       );
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CheckoutFlowScreen(),
-                        ),
-                      );
+                      final authProvider = context.read<AuthProvider>();
+                      if (!authProvider.isLoggedIn) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please log in with your mobile number to proceed to checkout'),
+                            backgroundColor: AppColors.primaryRed,
+                          ),
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(redirectToCheckout: true),
+                          ),
+                        );
+                      } else {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CheckoutFlowScreen(),
+                          ),
+                        );
+                      }
                     },
                   ),
                   const SizedBox(height: 20),
@@ -458,7 +521,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       color: AppColors.navyLight,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.navyDark.withOpacity(0.1),
+                        color: AppColors.navyDark.withValues(alpha: 0.1),
                       ),
                     ),
                     child: const Row(
@@ -547,35 +610,58 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // You May Also Like
-                  if (relatedProducts.isNotEmpty) ...[
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'You may also like',
+                  // Similar Products Section (Shows up to 20 products)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.categoryName.isNotEmpty
+                            ? 'More from ${product.categoryName}'
+                            : 'Similar Products',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.navyDark,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_isLoadingRelated)
+                        SizedBox(
+                          height: 275,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 5,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (_, __) => const SkeletonLoader(
+                              width: 160,
+                              height: 275,
+                              borderRadius: 16,
+                            ),
+                          ),
+                        )
+                      else if (_relatedProducts.isNotEmpty)
+                        SizedBox(
+                          height: 275,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _relatedProducts.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, index) =>
+                                ProductCard(product: _relatedProducts[index]),
+                          ),
+                        )
+                      else
+                        const Text(
+                          'No additional related items found.',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.navyDark,
+                            fontSize: 13,
+                            color: AppColors.textMuted,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 250,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: relatedProducts.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 12),
-                        itemBuilder: (context, index) =>
-                            ProductCard(product: relatedProducts[index]),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                  ],
+                      const SizedBox(height: 30),
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -12,6 +12,7 @@ import '../../providers/orders_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
+import '../../widgets/need_help_faq_sheet.dart';
 import '../location/location_selector_sheet.dart';
 import '../orders/order_success_screen.dart';
 
@@ -37,6 +38,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
 
   // Step 2: Selected slot date
   String? _selectedSlotDate;
+  String _fulfillmentType = 'DELIVERY'; // 'DELIVERY' or 'PICKUP'
 
   @override
   void initState() {
@@ -47,6 +49,13 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     _phoneController = TextEditingController(text: customer?.phone ?? '');
     _emailController = TextEditingController(text: customer?.email ?? '');
     _dobController = TextEditingController(text: customer?.dob ?? '');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final ordersProvider = context.read<OrdersProvider>();
+        context.read<CartProvider>().setCompletedDeliveriesCount(ordersProvider.completedDeliveriesCount);
+      }
+    });
   }
 
   @override
@@ -123,10 +132,10 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
       phone: address.phone.isNotEmpty ? address.phone : '9876543210',
       name: address.fullName.isNotEmpty ? address.fullName : 'Customer',
     );
-    final settings = storeProvider.deliverySettings;
+    final isPickup = _fulfillmentType == 'PICKUP';
     final subtotal = cartProvider.itemTotal;
-    final delFee = cartProvider.calculateDeliveryFee();
-    final total = cartProvider.calculateGrandTotal();
+    final delFee = cartProvider.calculateDeliveryFee(isPickup: isPickup);
+    final total = cartProvider.calculateGrandTotal(isPickup: isPickup);
     final slot = storeProvider.selectedSlot;
 
     if (_paymentMethod == 'COD') {
@@ -137,6 +146,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         subtotal: subtotal,
         deliveryFee: delFee,
         total: total,
+        orderType: _fulfillmentType,
         deliverySlotId: slot?.id,
         scheduledDeliveryDate: slot?.slotDate,
       );
@@ -165,6 +175,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         subtotal: subtotal,
         deliveryFee: delFee,
         total: total,
+        orderType: _fulfillmentType,
         deliverySlotId: slot?.id,
         scheduledDeliveryDate: slot?.slotDate,
         onSuccess: (OrderModel order) {
@@ -195,7 +206,8 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     final storeProvider = context.watch<StoreDeliveryProvider>();
     final ordersProvider = context.watch<OrdersProvider>();
 
-    final totalAmount = cartProvider.calculateGrandTotal();
+    final isPickup = _fulfillmentType == 'PICKUP';
+    final totalAmount = cartProvider.calculateGrandTotal(isPickup: isPickup);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -208,11 +220,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         centerTitle: true,
         actions: [
           TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('K MART Support: 1800-123-KMART')),
-              );
-            },
+            onPressed: () => NeedHelpFaqSheet.show(context),
             child: const Text(
               'Need help?',
               style: TextStyle(
@@ -467,7 +475,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Delivery Details',
+          'Fulfilment Method',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w900,
@@ -476,41 +484,110 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Choose your delivery address and a convenient time slot.',
+          'How would you like to receive your order?',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 20),
-
-        // Delivering To Header
+        const SizedBox(height: 16),
+        
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Delivering to',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.navyDark,
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _fulfillmentType = 'DELIVERY'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _fulfillmentType == 'DELIVERY' ? AppColors.primaryRedLight : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _fulfillmentType == 'DELIVERY' ? AppColors.primaryRed : AppColors.cardBorder,
+                      width: _fulfillmentType == 'DELIVERY' ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.local_shipping_outlined, color: _fulfillmentType == 'DELIVERY' ? AppColors.primaryRed : AppColors.textPrimary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Home Delivery',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _fulfillmentType == 'DELIVERY' ? AppColors.primaryRed : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            TextButton.icon(
-              icon: const Icon(Icons.add_circle_outline, size: 18),
-              label: const Text('Add New Address'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.navyDark,
-                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _fulfillmentType = 'PICKUP'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _fulfillmentType == 'PICKUP' ? AppColors.primaryRedLight : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _fulfillmentType == 'PICKUP' ? AppColors.primaryRed : AppColors.cardBorder,
+                      width: _fulfillmentType == 'PICKUP' ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.storefront_outlined, color: _fulfillmentType == 'PICKUP' ? AppColors.primaryRed : AppColors.textPrimary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Self Pickup',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _fulfillmentType == 'PICKUP' ? AppColors.primaryRed : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => const LocationSelectorSheet(),
-                );
-              },
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 24),
+
+        if (_fulfillmentType == 'DELIVERY') ...[
+          // Delivering To Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Delivering to',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.navyDark,
+                ),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Add New Address'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.navyDark,
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => const LocationSelectorSheet(),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
 
         // Saved Addresses List
         if (addresses.isEmpty) ...[
@@ -599,21 +676,62 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
             );
           }),
         ],
+        ],
+
+        if (_fulfillmentType == 'PICKUP') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primaryRedLight.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primaryRed.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.store_mall_directory_outlined, color: AppColors.primaryRed),
+                    SizedBox(width: 8),
+                    Text(
+                      'K MART Store',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '123 Supermarket Road, Main City Center',
+                  style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Collect your items anytime between 10 AM and 8 PM.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+
         const SizedBox(height: 24),
 
-        // Select Delivery Time
-        const Text(
-          'Select Delivery Time',
-          style: TextStyle(
+        // Select Delivery/Pickup Time
+        Text(
+          _fulfillmentType == 'DELIVERY' ? 'Select Delivery Time' : 'Select Pickup Date',
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: AppColors.navyDark,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Showing available slots for your address.',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        Text(
+          _fulfillmentType == 'DELIVERY'
+              ? 'Showing available slots for your address.'
+              : 'Select when you plan to collect your order.',
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 12),
 
@@ -782,27 +900,6 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
             ],
           );
         }(),
-        const SizedBox(height: 16),
-
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.navyLight,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.info_outline_rounded, color: AppColors.navyDark, size: 18),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Delivery slots are shown based on availability at your location.',
-                  style: TextStyle(fontSize: 12, color: AppColors.navyDark),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -816,9 +913,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
   ) {
     final address = storeProvider.selectedAddress;
     final slot = storeProvider.selectedSlot;
-    final settings = storeProvider.deliverySettings;
-    final delFee = cartProvider.calculateDeliveryFee();
-    final totalAmount = cartProvider.calculateGrandTotal();
+    final delFee = cartProvider.calculateDeliveryFee(isPickup: _fulfillmentType == 'PICKUP');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1001,19 +1096,21 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                 'Item Total (${cartProvider.itemCount} items)',
                 CurrencyFormatter.format(cartProvider.itemTotal),
               ),
-              if (cartProvider.totalSavings > 0) ...[
-                const SizedBox(height: 6),
-                _buildBillRow(
-                  'Discount',
-                  '-${CurrencyFormatter.format(cartProvider.totalSavings)}',
-                  valueColor: AppColors.successGreen,
-                ),
-              ],
               const SizedBox(height: 6),
               _buildBillRow(
-                'Delivery Fee',
+                _fulfillmentType == 'PICKUP' ? 'Pickup Fee' : 'Delivery Fee',
                 delFee == 0 ? 'FREE' : CurrencyFormatter.format(delFee),
                 valueColor: delFee == 0 ? AppColors.successGreen : null,
+              ),
+              const SizedBox(height: 6),
+              _buildBillRow(
+                'Handling Fee',
+                CurrencyFormatter.format(cartProvider.handlingFee),
+              ),
+              const SizedBox(height: 6),
+              _buildBillRow(
+                'Platform Fee',
+                CurrencyFormatter.format(cartProvider.platformFee),
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
@@ -1031,7 +1128,9 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                     ),
                   ),
                   Text(
-                    CurrencyFormatter.format(totalAmount),
+                    CurrencyFormatter.format(
+                      cartProvider.calculateGrandTotal(isPickup: _fulfillmentType == 'PICKUP'),
+                    ),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -1043,31 +1142,6 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-
-        // Savings badge
-        if (cartProvider.totalSavings > 0)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.successLight,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.verified_rounded, color: AppColors.successGreen, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  "You're saving ${CurrencyFormatter.format(cartProvider.totalSavings)} on this order! Great choices!",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.successGreen,
-                  ),
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }
@@ -1079,8 +1153,6 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     CartProvider cartProvider,
     StoreDeliveryProvider storeProvider,
   ) {
-    final settings = storeProvider.deliverySettings;
-    final totalAmount = cartProvider.calculateGrandTotal();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1249,19 +1321,25 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                 'Item Total',
                 CurrencyFormatter.format(cartProvider.itemTotal),
               ),
-              if (cartProvider.totalSavings > 0) ...[
-                const SizedBox(height: 6),
-                _buildBillRow(
-                  'Discount',
-                  '-${CurrencyFormatter.format(cartProvider.totalSavings)}',
-                  valueColor: AppColors.successGreen,
-                ),
-              ],
               const SizedBox(height: 6),
               _buildBillRow(
-                'Delivery Fee',
-                cartProvider.calculateDeliveryFee() == 0 ? 'FREE' : CurrencyFormatter.format(cartProvider.calculateDeliveryFee()),
-                valueColor: cartProvider.calculateDeliveryFee() == 0 ? AppColors.successGreen : AppColors.textPrimary,
+                _fulfillmentType == 'PICKUP' ? 'Pickup Fee' : 'Delivery Fee',
+                (_fulfillmentType == 'PICKUP' || cartProvider.calculateDeliveryFee(isPickup: _fulfillmentType == 'PICKUP') == 0)
+                    ? 'FREE'
+                    : CurrencyFormatter.format(cartProvider.calculateDeliveryFee(isPickup: _fulfillmentType == 'PICKUP')),
+                valueColor: (_fulfillmentType == 'PICKUP' || cartProvider.calculateDeliveryFee(isPickup: _fulfillmentType == 'PICKUP') == 0)
+                    ? AppColors.successGreen
+                    : AppColors.textPrimary,
+              ),
+              const SizedBox(height: 6),
+              _buildBillRow(
+                'Handling Fee',
+                CurrencyFormatter.format(cartProvider.handlingFee),
+              ),
+              const SizedBox(height: 6),
+              _buildBillRow(
+                'Platform Fee',
+                CurrencyFormatter.format(cartProvider.platformFee),
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -1275,7 +1353,9 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   Text(
-                    CurrencyFormatter.format(totalAmount),
+                    CurrencyFormatter.format(
+                      cartProvider.calculateGrandTotal(isPickup: _fulfillmentType == 'PICKUP'),
+                    ),
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 18,
@@ -1286,17 +1366,6 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 20),
-
-        // Security assurance badges
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _SecurityBadge(icon: Icons.lock_outline, label: 'Secure\nPayments'),
-            _SecurityBadge(icon: Icons.shield_outlined, label: 'Powered by\nRazorpay'),
-            _SecurityBadge(icon: Icons.verified_user_outlined, label: 'Trusted by\nMillions'),
-          ],
         ),
       ],
     );
@@ -1365,23 +1434,3 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
   }
 }
 
-class _SecurityBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _SecurityBadge({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.navyDark),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-}

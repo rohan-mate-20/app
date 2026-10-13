@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../models/order_model.dart';
 import '../models/cart_item_model.dart';
@@ -20,6 +20,15 @@ class OrdersProvider with ChangeNotifier {
   OrderModel? get activeOrder => _activeOrder;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+
+  /// Count of qualifying completed deliveries (excludes cancelled and pickup orders)
+  int get completedDeliveriesCount {
+    return _orders.where((o) {
+      final isDelivery = (o.orderType.toUpperCase() != 'PICKUP');
+      final notCancelled = o.status.toUpperCase() != 'CANCELLED' && o.status.toUpperCase() != 'FAILED';
+      return isDelivery && notCancelled;
+    }).length;
+  }
 
   Future<void> loadOrders(String customerId) async {
     if (customerId.isEmpty) return;
@@ -45,6 +54,7 @@ class OrdersProvider with ChangeNotifier {
     required double subtotal,
     required double deliveryFee,
     required double total,
+    required String orderType,
     String? deliverySlotId,
     String? scheduledDeliveryDate,
   }) async {
@@ -60,6 +70,7 @@ class OrdersProvider with ChangeNotifier {
       deliveryFee: deliveryFee,
       total: total,
       paymentMethod: 'COD',
+      orderType: orderType,
       deliverySlotId: deliverySlotId,
       scheduledDeliveryDate: scheduledDeliveryDate,
     );
@@ -84,6 +95,7 @@ class OrdersProvider with ChangeNotifier {
     required double subtotal,
     required double deliveryFee,
     required double total,
+    required String orderType,
     String? deliverySlotId,
     String? scheduledDeliveryDate,
     required Function(OrderModel order) onSuccess,
@@ -134,6 +146,7 @@ class OrdersProvider with ChangeNotifier {
           deliveryFee: deliveryFee,
           total: total,
           paymentMethod: 'ONLINE',
+          orderType: orderType,
           deliverySlotId: deliverySlotId,
           scheduledDeliveryDate: scheduledDeliveryDate,
           paymentId: res.paymentId,

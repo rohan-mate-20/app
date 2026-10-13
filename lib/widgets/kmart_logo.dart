@@ -15,38 +15,48 @@ class KMartLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double logoHeight = fontSize * 1.15;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              'K',
-              style: TextStyle(
-                color: AppColors.primaryRed,
-                fontSize: fontSize * 1.2,
-                fontWeight: FontWeight.w900,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -1.0,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              'MART',
-              style: TextStyle(
-                color: isLight ? Colors.white : AppColors.navyDark,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
+        Image.asset(
+          'assets/images/kmart-logo.png',
+          height: logoHeight,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  'K',
+                  style: TextStyle(
+                    color: AppColors.primaryRed,
+                    fontSize: fontSize * 1.2,
+                    fontWeight: FontWeight.w900,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: -1.0,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  'MART',
+                  style: TextStyle(
+                    color: isLight ? Colors.white : AppColors.navyDark,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-        if (showTagline)
+        if (showTagline) ...[
+          const SizedBox(height: 2),
           Text(
             'Daily Essentials, Delivered',
             style: TextStyle(
@@ -56,6 +66,7 @@ class KMartLogo extends StatelessWidget {
               letterSpacing: 0.2,
             ),
           ),
+        ],
       ],
     );
   }

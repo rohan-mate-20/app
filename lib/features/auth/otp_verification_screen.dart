@@ -4,15 +4,19 @@ import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
+import '../checkout/checkout_flow_screen.dart';
+import '../../widgets/need_help_faq_sheet.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String phone;
   final bool isModal;
+  final bool redirectToCheckout;
 
   const OtpVerificationScreen({
     super.key,
     required this.phone,
     this.isModal = false,
+    this.redirectToCheckout = false,
   });
 
   @override
@@ -63,7 +67,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           backgroundColor: AppColors.successGreen,
         ),
       );
-      Navigator.of(context).popUntil((route) => route.isFirst);
+
+      if (widget.redirectToCheckout) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const CheckoutFlowScreen(),
+          ),
+        );
+      } else {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -91,11 +104,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('K MART Support: 1800-123-KMART')),
-              );
-            },
+            onPressed: () => NeedHelpFaqSheet.show(context),
             child: const Text(
               'Need help?',
               style: TextStyle(

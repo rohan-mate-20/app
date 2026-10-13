@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../location/address_management_screen.dart';
 import '../orders/orders_screen.dart';
-import '../offers/offers_screen.dart';
+import '../../widgets/need_help_faq_sheet.dart';
 import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -183,39 +183,10 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildMenuItem(
-                    icon: Icons.local_offer_outlined,
-                    title: 'Offers & Discounts',
-                    subtitle: 'Coupons, promotions, and deals',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const OffersScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
                     icon: Icons.headset_mic_outlined,
                     title: 'Help & Customer Support',
                     subtitle: 'FAQs, toll-free support & complaints',
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('K MART Customer Support'),
-                          content: const Text(
-                            'Toll-Free: 1800-123-KMART\nEmail: support@kmartgrocery.com\nWorking Hours: 7:00 AM - 10:00 PM (Daily)',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('OK'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    onTap: () => NeedHelpFaqSheet.show(context),
                   ),
                   const Divider(height: 1, indent: 56),
                   _buildMenuItem(

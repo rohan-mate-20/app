@@ -1,24 +1,40 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
 
 import '../services/cart_service.dart';
+import '../services/delivery_service.dart';
 
 class CartProvider with ChangeNotifier {
   final CartService _cartService = CartService();
 
   List<CartItemModel> _items = [];
   String? _dbCartId;
-  String? _appliedCoupon;
-  double _couponDiscount = 0.0;
   bool _isLoading = false;
+  int _completedDeliveriesCount = 0;
 
   List<CartItemModel> get items => _items;
   int get itemCount => _items.fold(0, (sum, it) => sum + it.quantity);
   bool get isEmpty => _items.isEmpty;
-  String? get appliedCoupon => _appliedCoupon;
-  double get couponDiscount => _couponDiscount;
   bool get isLoading => _isLoading;
+
+  /// Handling Fee and Platform Fee (both default to 0.0)
+  double get handlingFee => DeliveryPricingService.handlingFee;
+  double get platformFee => DeliveryPricingService.platformFee;
+
+  /// Number of completed deliveries for promotion tracking
+  int get completedDeliveriesCount => _completedDeliveriesCount;
+
+  void setCompletedDeliveriesCount(int count) {
+    _completedDeliveriesCount = count;
+    notifyListeners();
+  }
+
+  /// Whether customer qualifies for the first 3 free deliveries
+  bool isEligibleForFreeDelivery([int? count]) {
+    final effective = count ?? _completedDeliveriesCount;
+    return effective < 3;
+  }
 
   /// Subtotal (sum of selling prices)
   double get itemTotal => _items.fold(0.0, (sum, it) => sum + it.lineTotal);
@@ -26,23 +42,33 @@ class CartProvider with ChangeNotifier {
   /// MRP Total
   double get mrpTotal => _items.fold(0.0, (sum, it) => sum + it.lineMrpTotal);
 
-  /// Total discount saved
-  double get totalSavings => (mrpTotal - itemTotal) + _couponDiscount;
+  /// Total product discount saved
+  double get totalSavings => (mrpTotal - itemTotal) > 0 ? (mrpTotal - itemTotal) : 0.0;
 
-  /// Calculate Delivery Fee dynamically
-  double calculateDeliveryFee() {
+  /// Calculate Delivery Fee using centralized DeliveryPricingService
+  double calculateDeliveryFee({bool isPickup = false, int? pastDeliveries}) {
     if (isEmpty) return 0.0;
-    if (itemTotal < 500) return 0.0; // Handled in UI as un-checkout-able
-    if (itemTotal < 1000) return 40.0;
-    return 70.0; // >= 1000 is 70 total
+    return DeliveryPricingService.calculateDeliveryFee(
+      subtotal: itemTotal,
+      isPickup: isPickup,
+      pastEligibleDeliveries: pastDeliveries ?? _completedDeliveriesCount,
+    );
   }
 
-  /// Grand total
-  double calculateGrandTotal() {
+  /// Grand total: Subtotal + Delivery + Handling + Platform (Coupons removed)
+  double calculateGrandTotal({bool isPickup = false, int? pastDeliveries}) {
     if (isEmpty) return 0.0;
-    final delFee = calculateDeliveryFee();
-    final total = itemTotal + delFee - _couponDiscount;
-    return total > 0 ? total : 0.0;
+    final delFee = calculateDeliveryFee(
+      isPickup: isPickup,
+      pastDeliveries: pastDeliveries,
+    );
+    return DeliveryPricingService.calculatePayableTotal(
+      subtotal: itemTotal,
+      deliveryFee: delFee,
+      productDiscounts: 0.0,
+      handling: handlingFee,
+      platform: platformFee,
+    );
   }
 
   int getQuantity(String productId) {
@@ -103,8 +129,6 @@ class CartProvider with ChangeNotifier {
 
   void clearCart() {
     _items.clear();
-    _appliedCoupon = null;
-    _couponDiscount = 0.0;
     if (_dbCartId != null) {
       _cartService.clearCart(_dbCartId!);
     }
@@ -115,35 +139,5 @@ class CartProvider with ChangeNotifier {
     if (_dbCartId != null) {
       _cartService.syncCartItem(_dbCartId!, productId, qty);
     }
-  }
-
-  Map<String, dynamic> applyCoupon(String code) {
-    final clean = code.trim().toUpperCase();
-    if (clean == 'KMART50') {
-      if (itemTotal < 250) {
-        return {'success': false, 'message': 'Min. order value for KMART50 is ₹250'};
-      }
-      _appliedCoupon = 'KMART50';
-      _couponDiscount = 50.0;
-      notifyListeners();
-      return {'success': true, 'message': 'Coupon KMART50 applied! ₹50 OFF'};
-    } else if (clean == 'WELCOME10') {
-      _appliedCoupon = 'WELCOME10';
-      _couponDiscount = (itemTotal * 0.10).roundToDouble();
-      notifyListeners();
-      return {'success': true, 'message': 'Coupon WELCOME10 applied! 10% OFF'};
-    } else if (clean == 'FREEDEL') {
-      _appliedCoupon = 'FREEDEL';
-      _couponDiscount = 40.0;
-      notifyListeners();
-      return {'success': true, 'message': 'Free Delivery Coupon Applied!'};
-    }
-    return {'success': false, 'message': 'Invalid coupon code'};
-  }
-
-  void removeCoupon() {
-    _appliedCoupon = null;
-    _couponDiscount = 0.0;
-    notifyListeners();
   }
 }

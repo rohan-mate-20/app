@@ -10,6 +10,7 @@ import '../models/customer_model.dart';
 import 'supabase_service.dart';
 import 'cart_service.dart';
 import 'checkout_service.dart';
+import 'delivery_service.dart';
 
 class OrderService {
   final _supabase = SupabaseService.client;
@@ -35,6 +36,7 @@ class OrderService {
     required double deliveryFee,
     required double total,
     required String paymentMethod, // 'ONLINE' or 'COD'
+    required String orderType, // 'DELIVERY' or 'PICKUP'
     String? deliverySlotId,
     String? scheduledDeliveryDate,
     String? paymentId,
@@ -42,6 +44,10 @@ class OrderService {
     String orderNumber = 'KM${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
     final idempotencyKey = const Uuid().v4();
     final paymentStatus = paymentMethod == 'COD' ? 'PENDING' : 'PAID';
+
+    final isPickup = orderType.toUpperCase() == 'PICKUP';
+    final effectiveDeliveryFee = isPickup ? 0.0 : deliveryFee;
+    final effectiveTotal = subtotal + effectiveDeliveryFee + DeliveryPricingService.handlingFee + DeliveryPricingService.platformFee;
 
     // 1. Ensure valid UUID for customer_id
     String resolvedCustId = _isUuid(customer.id) ? customer.id : const Uuid().v4();
@@ -154,9 +160,9 @@ class OrderService {
       // Step 4: Call Edge Function via CheckoutService
       final edgeData = await _checkoutService.placeOrder(
         customerId: resolvedCustId,
-        orderType: 'DELIVERY',
-        addressId: validAddressId,
-        deliverySlotId: validSlotId,
+        orderType: orderType,
+        addressId: orderType == 'DELIVERY' ? validAddressId : null,
+        deliverySlotId: orderType == 'DELIVERY' ? validSlotId : null,
         scheduledDate: scheduledDeliveryDate,
         paymentMethod: paymentMethod == 'COD' ? 'COD' : 'ONLINE',
         idempotencyKey: idempotencyKey,
@@ -184,16 +190,16 @@ class OrderService {
               'order_number': orderNumber,
               'customer_id': resolvedCustId,
               'store_id': EnvConfig.defaultStoreId,
-              'order_type': 'DELIVERY',
+              'order_type': orderType,
               'status': 'CONFIRMED',
               'payment_status': paymentStatus,
               'payment_method': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
               'subtotal': subtotal,
-              'delivery_fee': deliveryFee,
-              'total': total,
-              'delivery_slot_id': validSlotId,
+              'delivery_fee': effectiveDeliveryFee,
+              'total': effectiveTotal,
+              'delivery_slot_id': orderType == 'DELIVERY' ? validSlotId : null,
               'scheduled_delivery_date': scheduledDeliveryDate,
-              'delivery_address_snapshot': address.toJson(),
+              'delivery_address_snapshot': orderType == 'DELIVERY' ? address.toJson() : null,
               'customer_snapshot': customer.toJson(),
               'idempotency_key': idempotencyKey,
             })
@@ -259,8 +265,8 @@ class OrderService {
       paymentStatus: paymentStatus,
       paymentMethod: paymentMethod,
       subtotal: subtotal,
-      deliveryFee: deliveryFee,
-      total: total,
+      deliveryFee: effectiveDeliveryFee,
+      total: effectiveTotal,
       deliverySlotId: validSlotId,
       scheduledDeliveryDate: scheduledDeliveryDate,
       deliveryAddress: address,

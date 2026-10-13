@@ -14,6 +14,7 @@ class CatalogProvider with ChangeNotifier {
   final ProductService _productService = ProductService();
 
   List<ProductModel> _allProducts = [];
+  List<ProductModel> _searchResults = [];
   List<CategoryModel> _categories = [];
   String _selectedCategorySlug = 'all';
   String _searchQuery = '';
@@ -91,8 +92,26 @@ class CatalogProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void setSearchQuery(String query) {
+  Future<void> setSearchQuery(String query) async {
     _searchQuery = query;
+    if (query.trim().isEmpty) {
+      _searchResults.clear();
+      notifyListeners();
+      return;
+    }
+    
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final results = await _productService.searchProducts(query);
+      _searchResults = results;
+    } catch (e) {
+      debugPrint('[CatalogProvider] setSearchQuery error: $e');
+      _searchResults.clear();
+    }
+    
+    _isLoading = false;
     notifyListeners();
   }
 
@@ -113,7 +132,9 @@ class CatalogProvider with ChangeNotifier {
   bool isWishlisted(String productId) => _wishlistProductIds.contains(productId);
 
   List<ProductModel> get filteredProducts {
-    List<ProductModel> list = List.from(_allProducts);
+    List<ProductModel> list = _searchQuery.trim().isNotEmpty 
+        ? List.from(_searchResults) 
+        : List.from(_allProducts);
 
     // 1. Filter by category
     if (_selectedCategorySlug != 'all') {
@@ -124,17 +145,7 @@ class CatalogProvider with ChangeNotifier {
       }
     }
 
-    // 2. Filter by search query
-    if (_searchQuery.trim().isNotEmpty) {
-      final query = _searchQuery.toLowerCase().trim();
-      list = list.where((p) {
-        return p.name.toLowerCase().contains(query) ||
-            (p.brand != null && p.brand!.toLowerCase().contains(query)) ||
-            p.categoryName.toLowerCase().contains(query);
-      }).toList();
-    }
-
-    // 3. Sort
+    // 2. Sort
     switch (_sortOption) {
       case ProductSortOption.priceLowToHigh:
         list.sort((a, b) => a.sellingPrice.compareTo(b.sellingPrice));

@@ -5,6 +5,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../models/order_model.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
+import '../../widgets/need_help_faq_sheet.dart';
 import '../navigation/main_navigation_shell.dart';
 import 'orders_screen.dart';
 
@@ -23,11 +24,7 @@ class OrderSuccessScreen extends StatelessWidget {
         centerTitle: true,
         actions: [
           TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('K MART Support: 1800-123-KMART')),
-              );
-            },
+            onPressed: () => NeedHelpFaqSheet.show(context),
             child: const Text(
               'Need help?',
               style: TextStyle(
