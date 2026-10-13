@@ -7,6 +7,7 @@ import '../orders/orders_screen.dart';
 import '../../widgets/need_help_faq_sheet.dart';
 import '../auth/login_screen.dart';
 import '../legal/terms_and_privacy_screen.dart';
+import '../../providers/orders_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -236,6 +237,7 @@ class ProfileScreen extends StatelessWidget {
                           ElevatedButton(
                             onPressed: () {
                               authProvider.signOut();
+                              context.read<OrdersProvider>().clearOrders();
                               Navigator.pop(context);
                             },
                             style: ElevatedButton.styleFrom(

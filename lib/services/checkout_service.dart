@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'supabase_service.dart';
 
 class CheckoutService {
-  final SupabaseClient _supabase = SupabaseService.client;
+  SupabaseClient get _supabase => SupabaseService.client;
 
   /// Invokes the official K MART Supabase checkout Edge Function
   Future<Map<String, dynamic>> placeOrder({

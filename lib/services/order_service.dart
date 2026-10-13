@@ -12,9 +12,10 @@ import 'cart_service.dart';
 import 'checkout_service.dart';
 import 'delivery_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OrderService {
-  final _supabase = SupabaseService.client;
+  SupabaseClient get _supabase => SupabaseService.client;
   final _cartService = CartService();
   final _checkoutService = CheckoutService();
   static const String _prefKeyLocalOrders = 'kmart_local_cached_orders';
@@ -398,44 +399,56 @@ class OrderService {
     }
   }
 
+  /// Clear local orders cache on logout
+  Future<void> clearLocalCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefKeyLocalOrders);
+    } catch (e) {
+      debugPrint('[OrderService] Error clearing local orders cache: $e');
+    }
+  }
+
   /// Fetch user orders (merges Supabase live orders with local cache)
   Future<List<OrderModel>> fetchOrders(String customerId) async {
+    if (customerId.trim().isEmpty) {
+      return [];
+    }
+
     final Map<String, OrderModel> orderMap = {};
 
     // 1. Fetch from Supabase
-    if (customerId.isNotEmpty) {
-      try {
-        final response = await _supabase
-            .from('orders')
-            .select('''
+    try {
+      final response = await _supabase
+          .from('orders')
+          .select('''
+            *,
+            order_items (
               *,
-              order_items (
+              products (
                 *,
-                products (
-                  *,
-                  categories ( name )
-                )
-              ),
-              order_status_history (
-                *
+                categories ( name )
               )
-            ''')
-            .eq('customer_id', customerId)
-            .order('created_at', ascending: false);
+            ),
+            order_status_history (
+              *
+            )
+          ''')
+          .eq('customer_id', customerId)
+          .order('created_at', ascending: false);
 
-        final list = response as List;
-        for (final item in list) {
-          try {
-            final ord = OrderModel.fromJson(Map<String, dynamic>.from(item));
-            orderMap[ord.id] = ord;
-          } catch (_) {}
-        }
-      } catch (e) {
-        debugPrint('[OrderService] fetchOrders DB error: $e');
+      final list = response as List;
+      for (final item in list) {
+        try {
+          final ord = OrderModel.fromJson(Map<String, dynamic>.from(item));
+          orderMap[ord.id] = ord;
+        } catch (_) {}
       }
+    } catch (e) {
+      debugPrint('[OrderService] fetchOrders DB error: $e');
     }
 
-    // 2. Fetch from Local Cache
+    // 2. Fetch from Local Cache (filtered strictly to this customer)
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_prefKeyLocalOrders) ?? [];
@@ -443,8 +456,11 @@ class OrderService {
         try {
           final map = Map<String, dynamic>.from(jsonDecode(s));
           final ord = OrderModel.fromJson(map);
-          if (!orderMap.containsKey(ord.id)) {
-            orderMap[ord.id] = ord;
+          // Only show cached orders that belong to this logged-in customer
+          if (ord.customerId == customerId) {
+            if (!orderMap.containsKey(ord.id)) {
+              orderMap[ord.id] = ord;
+            }
           }
         } catch (_) {}
       }

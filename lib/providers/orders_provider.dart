@@ -30,8 +30,24 @@ class OrdersProvider with ChangeNotifier {
     }).length;
   }
 
+  /// Clear all orders and local cache on logout
+  Future<void> clearOrders() async {
+    _orders = [];
+    _activeOrder = null;
+    _isLoading = false;
+    _errorMessage = null;
+    await _orderService.clearLocalCache();
+    notifyListeners();
+  }
+
   Future<void> loadOrders(String customerId) async {
-    if (customerId.isEmpty) return;
+    if (customerId.trim().isEmpty) {
+      _orders = [];
+      _activeOrder = null;
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

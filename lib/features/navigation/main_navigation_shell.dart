@@ -80,6 +80,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         context.read<StoreDeliveryProvider>().loadCustomerAddresses(customer.id);
         context.read<OrdersProvider>().loadOrders(customer.id);
       });
+    } else if (customer == null && _initializedCustomerId != null) {
+      _initializedCustomerId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<OrdersProvider>().clearOrders();
+      });
     }
   }
 

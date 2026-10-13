@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 class CartService {
-  final _supabase = SupabaseService.client;
+  SupabaseClient get _supabase => SupabaseService.client;
 
   Future<String?> getOrCreateCartId(String customerId) async {
     if (customerId.isEmpty) return null;

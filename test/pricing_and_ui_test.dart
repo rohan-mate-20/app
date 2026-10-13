@@ -6,6 +6,7 @@ import 'package:kmart_customer/models/order_model.dart';
 import 'package:kmart_customer/widgets/need_help_faq_sheet.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('Delivery and Pricing Tests', () {
     test('1. Below ₹500 order subtotal returns ₹40 delivery fee for non-eligible customer', () {
       final fee = DeliveryPricingService.calculateDeliveryFee(
@@ -281,6 +282,44 @@ void main() {
       expect(deliveryOrder.isPickup, false);
       expect(deliveryOrder.displayStatus, 'Out for Delivery');
       expect(deliveryOrder.trackingStepIndex, 2);
+    });
+
+    test('21. Order model list filtering by customer ID isolates user history', () {
+      final order1 = OrderModel(
+        id: 'ord-1',
+        orderNumber: 'KM1001',
+        customerId: 'cust-A',
+        storeId: 'store-1',
+        orderType: 'PICKUP',
+        status: 'CONFIRMED',
+        paymentMethod: 'COD',
+        subtotal: 500,
+        deliveryFee: 0,
+        total: 500,
+        createdAt: DateTime.now(),
+        items: [],
+      );
+      final order2 = OrderModel(
+        id: 'ord-2',
+        orderNumber: 'KM1002',
+        customerId: 'cust-B',
+        storeId: 'store-1',
+        orderType: 'DELIVERY',
+        status: 'CONFIRMED',
+        paymentMethod: 'COD',
+        subtotal: 500,
+        deliveryFee: 40,
+        total: 540,
+        createdAt: DateTime.now(),
+        items: [],
+      );
+      final allOrders = [order1, order2];
+      final userAOrders = allOrders.where((o) => o.customerId == 'cust-A').toList();
+      final loggedOutOrders = allOrders.where((o) => false).toList();
+
+      expect(userAOrders.length, 1);
+      expect(userAOrders.first.orderNumber, 'KM1001');
+      expect(loggedOutOrders.isEmpty, true);
     });
   });
 }

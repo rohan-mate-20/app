@@ -22,15 +22,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final customer = context.read<AuthProvider>().currentCustomer;
-      if (customer != null) {
-        context.read<OrdersProvider>().loadOrders(customer.id);
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (auth.isLoggedIn && auth.currentCustomer != null) {
+        context.read<OrdersProvider>().loadOrders(auth.currentCustomer!.id);
+      } else {
+        context.read<OrdersProvider>().clearOrders();
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
     final ordersProvider = context.watch<OrdersProvider>();
     final orders = ordersProvider.orders;
 
@@ -39,27 +43,27 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         title: const Text('My Orders'),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          final customer = context.read<AuthProvider>().currentCustomer;
-          if (customer != null) {
-            await ordersProvider.loadOrders(customer.id);
-          }
-        },
-        color: AppColors.primaryRed,
-        child: (!context.watch<AuthProvider>().isLoggedIn && orders.isEmpty)
-            ? EmptyStateView(
-                title: 'Sign In to View Orders',
-                message: 'Log in with your mobile number to view and track your orders.',
-                icon: Icons.receipt_long_outlined,
-                buttonText: 'Sign In',
-                onButtonPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LoginScreen(isModal: true)),
-                  );
-                },
-              )
-            : ordersProvider.isLoading
+      body: (!authProvider.isLoggedIn)
+          ? EmptyStateView(
+              title: 'Sign In to View Orders',
+              message: 'Log in with your mobile number to view and track your orders.',
+              icon: Icons.receipt_long_outlined,
+              buttonText: 'Sign In',
+              onButtonPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen(isModal: true)),
+                );
+              },
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                final customer = context.read<AuthProvider>().currentCustomer;
+                if (customer != null) {
+                  await ordersProvider.loadOrders(customer.id);
+                }
+              },
+              color: AppColors.primaryRed,
+              child: ordersProvider.isLoading
                 ? ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: 4,
