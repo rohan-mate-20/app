@@ -6,6 +6,7 @@ import '../location/address_management_screen.dart';
 import '../orders/orders_screen.dart';
 import '../../widgets/need_help_faq_sheet.dart';
 import '../auth/login_screen.dart';
+import '../legal/terms_and_privacy_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -194,21 +195,9 @@ class ProfileScreen extends StatelessWidget {
                     title: 'Terms & Privacy Policy',
                     subtitle: 'Terms of service, refund & privacy',
                     onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('Terms of Service'),
-                          content: const SingleChildScrollView(
-                            child: Text(
-                              'K MART Daily Essentials Guarantee.\n\nAll products are quality checked and delivered fresh. Returns accepted at the time of delivery if items are damaged or substandard.',
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'),
-                            ),
-                          ],
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TermsAndPrivacyScreen(),
                         ),
                       );
                     },

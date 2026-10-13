@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kmart_customer/services/delivery_service.dart';
 import 'package:kmart_customer/models/delivery_settings_model.dart';
+import 'package:kmart_customer/models/delivery_slot_model.dart';
+import 'package:kmart_customer/models/order_model.dart';
 import 'package:kmart_customer/widgets/need_help_faq_sheet.dart';
 
 void main() {
@@ -178,6 +180,107 @@ void main() {
       expect(NeedHelpFaqSheet.faqs[5]['question'], 'What payment methods are available?');
       expect(NeedHelpFaqSheet.faqs[6]['question'], 'What are handling and platform fees?');
       expect(NeedHelpFaqSheet.faqs[7]['question'], 'How can I contact customer support?');
+    });
+  });
+
+  group('Delivery Slot Future Availability Tests', () {
+    test('15. Morning time (9 AM): today has both 11-2 and 4-7 slots', () {
+      final morningTime = DateTime(2026, 10, 13, 9, 0);
+      final slots = DeliverySlotModel.getUpcomingSlots(daysAhead: 5, customNow: morningTime);
+      const todayDateStr = '2026-10-13';
+      final todaySlots = slots.where((s) => s.slotDate == todayDateStr).toList();
+
+      expect(todaySlots.length, 2);
+      expect(todaySlots[0].timeRange, '11:00 AM - 2:00 PM');
+      expect(todaySlots[0].slotName, 'Morning');
+      expect(todaySlots[1].timeRange, '4:00 PM - 7:00 PM');
+      expect(todaySlots[1].slotName, 'Evening');
+    });
+
+    test('16. Afternoon time (1 PM): today only has future 4-7 slot (11-2 passed)', () {
+      final afternoonTime = DateTime(2026, 10, 13, 13, 0);
+      final slots = DeliverySlotModel.getUpcomingSlots(daysAhead: 5, customNow: afternoonTime);
+      const todayDateStr = '2026-10-13';
+      final todaySlots = slots.where((s) => s.slotDate == todayDateStr).toList();
+
+      expect(todaySlots.length, 1);
+      expect(todaySlots[0].timeRange, '4:00 PM - 7:00 PM');
+      expect(todaySlots[0].slotName, 'Evening');
+    });
+
+    test('17. Evening time (5 PM): today has no remaining slots, starts tomorrow with both slots', () {
+      final eveningTime = DateTime(2026, 10, 13, 17, 0);
+      final slots = DeliverySlotModel.getUpcomingSlots(daysAhead: 5, customNow: eveningTime);
+      const todayDateStr = '2026-10-13';
+      final todaySlots = slots.where((s) => s.slotDate == todayDateStr).toList();
+
+      expect(todaySlots.isEmpty, true);
+
+      const tomorrowDateStr = '2026-10-14';
+      final tomorrowSlots = slots.where((s) => s.slotDate == tomorrowDateStr).toList();
+      expect(tomorrowSlots.length, 2);
+      expect(tomorrowSlots[0].timeRange, '11:00 AM - 2:00 PM');
+      expect(tomorrowSlots[1].timeRange, '4:00 PM - 7:00 PM');
+    });
+
+    test('18. Future days (Tomorrow onwards) always provide both 11-2 and 4-7 slots', () {
+      final now = DateTime(2026, 10, 13, 10, 0);
+      final slots = DeliverySlotModel.getUpcomingSlots(daysAhead: 4, customNow: now);
+      final dates = slots.map((s) => s.slotDate).toSet().toList();
+
+      for (final date in dates) {
+        final daySlots = slots.where((s) => s.slotDate == date).toList();
+        if (date != '2026-10-13') {
+          expect(daySlots.length, 2);
+          expect(daySlots.any((s) => s.timeRange == '11:00 AM - 2:00 PM'), true);
+          expect(daySlots.any((s) => s.timeRange == '4:00 PM - 7:00 PM'), true);
+        }
+      }
+    });
+  });
+
+  group('Self Pickup Order Tracking Tests', () {
+    test('19. OrderModel isPickup identifies pickup orders', () {
+      final pickupOrder = OrderModel(
+        id: 'ord-1',
+        orderNumber: 'KM1001',
+        customerId: 'cust-1',
+        storeId: 'store-1',
+        orderType: 'PICKUP',
+        status: 'CONFIRMED',
+        paymentMethod: 'COD',
+        subtotal: 500,
+        deliveryFee: 0,
+        total: 500,
+        createdAt: DateTime.now(),
+        items: [],
+      );
+      expect(pickupOrder.isPickup, true);
+      expect(pickupOrder.displayStatus, 'Order Confirmed');
+
+      final packedPickup = pickupOrder.copyWith(status: 'PACKED');
+      expect(packedPickup.displayStatus, 'Packed & Ready for Pickup');
+      expect(packedPickup.trackingStepIndex, 1);
+    });
+
+    test('20. Delivery order tracking retains out for delivery', () {
+      final deliveryOrder = OrderModel(
+        id: 'ord-2',
+        orderNumber: 'KM1002',
+        customerId: 'cust-1',
+        storeId: 'store-1',
+        orderType: 'DELIVERY',
+        status: 'OUT_FOR_DELIVERY',
+        paymentMethod: 'COD',
+        subtotal: 500,
+        deliveryFee: 40,
+        total: 540,
+        createdAt: DateTime.now(),
+        items: [],
+      );
+      expect(deliveryOrder.isPickup, false);
+      expect(deliveryOrder.displayStatus, 'Out for Delivery');
+      expect(deliveryOrder.trackingStepIndex, 2);
     });
   });
 }

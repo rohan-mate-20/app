@@ -1,21 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/order_model.dart';
+import '../../providers/notification_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
 import '../../widgets/need_help_faq_sheet.dart';
 import '../navigation/main_navigation_shell.dart';
+import '../notifications/notifications_screen.dart';
 import 'orders_screen.dart';
 
-class OrderSuccessScreen extends StatelessWidget {
+class OrderSuccessScreen extends StatefulWidget {
   final OrderModel order;
 
   const OrderSuccessScreen({super.key, required this.order});
 
   @override
+  State<OrderSuccessScreen> createState() => _OrderSuccessScreenState();
+}
+
+class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _showNotificationPopup();
+      }
+    });
+  }
+
+  void _showNotificationPopup() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 24),
+        backgroundColor: AppColors.navyDark,
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: AppColors.primaryRed,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Order Notification Received! 🔔',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Text(
+                    'Order #${widget.order.orderNumber} added to notification bell.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'VIEW',
+          textColor: AppColors.primaryRed,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            );
+          },
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final order = widget.order;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -23,6 +93,46 @@ class OrderSuccessScreen extends StatelessWidget {
         title: const KMartLogo(fontSize: 20, showTagline: false),
         centerTitle: true,
         actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, notifProv, _) {
+              final unread = notifProv.unreadCount;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined, color: AppColors.navyDark),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      );
+                    },
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryRed,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           TextButton(
             onPressed: () => NeedHelpFaqSheet.show(context),
             child: const Text(
@@ -65,22 +175,24 @@ class OrderSuccessScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Order Confirmed!',
-                          style: TextStyle(
+                          order.isPickup ? 'Self Pickup Confirmed!' : 'Order Confirmed!',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                             color: AppColors.successGreen,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'Thank you for shopping with K MART.\nYour order has been placed successfully.',
-                          style: TextStyle(
+                          order.isPickup
+                              ? 'Thank you for shopping with K MART.\nYour pickup order is confirmed. Pick it up from store when packed.'
+                              : 'Thank you for shopping with K MART.\nYour order has been placed successfully.',
+                          style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textPrimary,
                           ),
@@ -119,6 +231,44 @@ class OrderSuccessScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+
+            // Notification Bell Link Banner
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.navyDark.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.navyDark.withValues(alpha: 0.15)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryRed,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 14),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Notification received on bell icon 🔔 Tap to view all updates',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navyDark),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
 
             // Delivery & Slot Information Row
@@ -135,17 +285,17 @@ class OrderSuccessScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             Icon(
-                              Icons.location_on_outlined,
+                              order.isPickup ? Icons.storefront_outlined : Icons.location_on_outlined,
                               size: 16,
                               color: AppColors.primaryRed,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
-                              'Delivering to',
-                              style: TextStyle(
+                              order.isPickup ? 'Store Pickup' : 'Delivering to',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -154,15 +304,16 @@ class OrderSuccessScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          order.deliveryAddress?.label ?? 'Home',
+                          order.isPickup ? 'K MART Central Store' : (order.deliveryAddress?.label ?? 'Home'),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
                         ),
                         Text(
-                          order.deliveryAddress?.fullAddressString ??
-                              '123, Green Park, Pune',
+                          order.isPickup
+                              ? 'Main Road, Baramati, Maharashtra'
+                              : (order.deliveryAddress?.fullAddressString ?? '123, Green Park, Pune'),
                           style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
@@ -183,37 +334,57 @@ class OrderSuccessScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.cardBorder),
                     ),
-                    child: const Column(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.schedule_rounded,
                               size: 16,
                               color: AppColors.navyDark,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
-                              'Delivery Slot',
-                              style: TextStyle(
+                              order.isPickup ? 'Pickup Slot' : 'Delivery Slot',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
+                        () {
+                          String dateLabel = 'Today';
+                          if (order.scheduledDeliveryDate != null && order.scheduledDeliveryDate!.isNotEmpty) {
+                            final dt = DateTime.tryParse(order.scheduledDeliveryDate!);
+                            if (dt != null) {
+                              final now = DateTime.now();
+                              final today = DateTime(now.year, now.month, now.day);
+                              final slotDay = DateTime(dt.year, dt.month, dt.day);
+                              final diffDays = slotDay.difference(today).inDays;
+                              if (diffDays == 0) {
+                                dateLabel = 'Today';
+                              } else if (diffDays == 1) {
+                                dateLabel = 'Tomorrow';
+                              } else {
+                                const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                dateLabel = '${weekdays[dt.weekday - 1]}, ${dt.day}/${dt.month}';
+                              }
+                            }
+                          }
+                          return Text(
+                            dateLabel,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          );
+                        }(),
                         Text(
-                          'Tomorrow',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        Text(
-                          '8:00 AM - 12:00 PM',
-                          style: TextStyle(
+                          order.deliverySlotTime ?? '11:00 AM - 2:00 PM',
+                          style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
                           ),
@@ -251,35 +422,58 @@ class OrderSuccessScreen extends StatelessWidget {
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatusStep(
-                    Icons.check_circle_rounded,
-                    'Order\nConfirmed',
-                    'Today',
-                    true,
-                  ),
-                  _buildTimelineConnector(true),
-                  _buildStatusStep(
-                    Icons.inventory_2_outlined,
-                    'Packed',
-                    'Processing',
-                    false,
-                  ),
-                  _buildTimelineConnector(false),
-                  _buildStatusStep(
-                    Icons.local_shipping_outlined,
-                    'Out for\nDelivery',
-                    'Pending',
-                    false,
-                  ),
-                  _buildTimelineConnector(false),
-                  _buildStatusStep(
-                    Icons.home_outlined,
-                    'Delivered',
-                    'Pending',
-                    false,
-                  ),
-                ],
+                children: order.isPickup
+                    ? [
+                        _buildStatusStep(
+                          Icons.check_circle_rounded,
+                          'Order\nConfirmed',
+                          'Today',
+                          true,
+                        ),
+                        _buildTimelineConnector(false),
+                        _buildStatusStep(
+                          Icons.inventory_2_outlined,
+                          'Packed at\nStore',
+                          'Processing',
+                          false,
+                        ),
+                        _buildTimelineConnector(false),
+                        _buildStatusStep(
+                          Icons.storefront_outlined,
+                          'Ready for\nPickup',
+                          'Pending',
+                          false,
+                        ),
+                      ]
+                    : [
+                        _buildStatusStep(
+                          Icons.check_circle_rounded,
+                          'Order\nConfirmed',
+                          'Today',
+                          true,
+                        ),
+                        _buildTimelineConnector(true),
+                        _buildStatusStep(
+                          Icons.inventory_2_outlined,
+                          'Packed',
+                          'Processing',
+                          false,
+                        ),
+                        _buildTimelineConnector(false),
+                        _buildStatusStep(
+                          Icons.local_shipping_outlined,
+                          'Out for\nDelivery',
+                          'Pending',
+                          false,
+                        ),
+                        _buildTimelineConnector(false),
+                        _buildStatusStep(
+                          Icons.home_outlined,
+                          'Delivered',
+                          'Pending',
+                          false,
+                        ),
+                      ],
               ),
             ),
             const SizedBox(height: 20),

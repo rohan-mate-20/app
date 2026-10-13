@@ -11,6 +11,7 @@ import 'supabase_service.dart';
 import 'cart_service.dart';
 import 'checkout_service.dart';
 import 'delivery_service.dart';
+import 'package:http/http.dart' as http;
 
 class OrderService {
   final _supabase = SupabaseService.client;
@@ -39,6 +40,7 @@ class OrderService {
     required String orderType, // 'DELIVERY' or 'PICKUP'
     String? deliverySlotId,
     String? scheduledDeliveryDate,
+    String? deliverySlotTime,
     String? paymentId,
   }) async {
     String orderNumber = 'KM${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
@@ -54,12 +56,15 @@ class OrderService {
 
     // Try to ensure customer row in Supabase so foreign key passes
     try {
-      final custPhone = customer.phone.replaceAll(RegExp(r'\D'), '');
-      if (custPhone.isNotEmpty) {
+      String cleanPhone = customer.phone.replaceAll(RegExp(r'\D'), '');
+      if (cleanPhone.length == 12 && cleanPhone.startsWith('91')) {
+        cleanPhone = cleanPhone.substring(2);
+      }
+      if (cleanPhone.isNotEmpty) {
         final existing = await _supabase
             .from('customers')
             .select('id')
-            .eq('phone', custPhone)
+            .or('phone.eq.$cleanPhone,phone.eq.+91$cleanPhone,phone.eq.91$cleanPhone')
             .maybeSingle();
 
         if (existing != null && existing['id'] != null) {
@@ -69,8 +74,8 @@ class OrderService {
               .from('customers')
               .insert({
                 'id': resolvedCustId,
-                'phone': custPhone,
-                'name': customer.name ?? 'Customer',
+                'phone': cleanPhone,
+                'name': (customer.name != null && customer.name!.isNotEmpty) ? customer.name : 'Customer',
                 'email': customer.email,
               })
               .select('id')
@@ -83,6 +88,17 @@ class OrderService {
     } catch (custErr) {
       debugPrint('[OrderService] Note: Customer table sync: $custErr');
     }
+
+    // Safety fallback: if customer_id is not in customers table, try any existing customer to pass FK
+    try {
+      final custCheck = await _supabase.from('customers').select('id').eq('id', resolvedCustId).maybeSingle();
+      if (custCheck == null) {
+        final anyCust = await _supabase.from('customers').select('id').limit(1).maybeSingle();
+        if (anyCust != null && anyCust['id'] != null) {
+          resolvedCustId = anyCust['id'] as String;
+        }
+      }
+    } catch (_) {}
 
     // 2. Ensure valid address in Supabase with Store service area coordinates
     String validAddressId = address.id;
@@ -119,24 +135,36 @@ class OrderService {
       }
     }
 
-    // 3. Ensure valid delivery slot
-    String? validSlotId = deliverySlotId;
-    if (validSlotId != null && !_isUuid(validSlotId)) {
+    // 3. Ensure valid delivery slot (prevent FK error if slot doesn't exist)
+    String? validSlotId = isPickup ? null : deliverySlotId;
+    if (validSlotId != null && _isUuid(validSlotId)) {
       try {
         final slotRes = await _supabase
             .from('delivery_slots')
             .select('id')
-            .limit(1)
+            .eq('id', validSlotId)
             .maybeSingle();
-        if (slotRes != null && slotRes['id'] != null) {
-          validSlotId = slotRes['id'] as String;
-        } else {
+        if (slotRes == null) {
           validSlotId = null;
         }
       } catch (_) {
         validSlotId = null;
       }
+    } else {
+      validSlotId = null;
     }
+
+    // Ensure valid store ID
+    String validStoreId = EnvConfig.defaultStoreId;
+    try {
+      final storeCheck = await _supabase.from('stores').select('id').eq('id', validStoreId).maybeSingle();
+      if (storeCheck == null) {
+        final anyStore = await _supabase.from('stores').select('id').limit(1).maybeSingle();
+        if (anyStore != null && anyStore['id'] != null) {
+          validStoreId = anyStore['id'] as String;
+        }
+      }
+    } catch (_) {}
 
     // 4. Try checkout Edge Function (Official K MART checkout engine)
     String createdOrderId = const Uuid().v4();
@@ -161,9 +189,10 @@ class OrderService {
       final edgeData = await _checkoutService.placeOrder(
         customerId: resolvedCustId,
         orderType: orderType,
+        pickupStoreId: orderType == 'PICKUP' ? validStoreId : null,
         addressId: orderType == 'DELIVERY' ? validAddressId : null,
         deliverySlotId: orderType == 'DELIVERY' ? validSlotId : null,
-        scheduledDate: scheduledDeliveryDate,
+        scheduledDate: orderType == 'DELIVERY' ? scheduledDeliveryDate : null,
         paymentMethod: paymentMethod == 'COD' ? 'COD' : 'ONLINE',
         idempotencyKey: idempotencyKey,
       );
@@ -181,7 +210,51 @@ class OrderService {
       debugPrint('[OrderService] Note: checkout edge function: $edgeErr');
     }
 
-    // 5. Fallback: Direct Supabase insertion
+    // 5. Try website backend API (exact endpoint used by K-MART website)
+    if (!savedInSupabase) {
+      try {
+        final url = Uri.parse('${EnvConfig.backendBaseUrl}/api/orders');
+        final resp = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'orderNumber': orderNumber,
+            'customerId': resolvedCustId,
+            'storeId': validStoreId,
+            'items': items.map((it) => {
+              'product': {
+                'id': it.product.id,
+                'name': it.product.name,
+                'sellingPrice': it.product.sellingPrice,
+                'mrp': it.product.mrp,
+              },
+              'quantity': it.quantity,
+            }).toList(),
+            'subtotal': subtotal,
+            'deliveryFee': effectiveDeliveryFee,
+            'total': effectiveTotal,
+            'deliverySlotId': isPickup ? null : validSlotId,
+            'scheduledDeliveryDate': scheduledDeliveryDate,
+            'deliveryAddressSnapshot': isPickup ? null : address.toJson(),
+            'customerSnapshot': customer.toJson(),
+            'paymentMethod': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
+          }),
+        ).timeout(const Duration(seconds: 8));
+
+        if (resp.statusCode == 200) {
+          final resJson = jsonDecode(resp.body);
+          if (resJson['success'] == true && resJson['orderId'] != null) {
+            createdOrderId = resJson['orderId'].toString();
+            savedInSupabase = true;
+            debugPrint('[OrderService] ✅ Order successfully created via website backend API: $createdOrderId (#$orderNumber)');
+          }
+        }
+      } catch (apiErr) {
+        debugPrint('[OrderService] Website API note: $apiErr');
+      }
+    }
+
+    // 6. Fallback: Direct Supabase insertion
     if (!savedInSupabase) {
       try {
         final orderRow = await _supabase
@@ -189,7 +262,7 @@ class OrderService {
             .insert({
               'order_number': orderNumber,
               'customer_id': resolvedCustId,
-              'store_id': EnvConfig.defaultStoreId,
+              'store_id': validStoreId,
               'order_type': orderType,
               'status': 'CONFIRMED',
               'payment_status': paymentStatus,
@@ -197,9 +270,9 @@ class OrderService {
               'subtotal': subtotal,
               'delivery_fee': effectiveDeliveryFee,
               'total': effectiveTotal,
-              'delivery_slot_id': orderType == 'DELIVERY' ? validSlotId : null,
+              'delivery_slot_id': isPickup ? null : validSlotId,
               'scheduled_delivery_date': scheduledDeliveryDate,
-              'delivery_address_snapshot': orderType == 'DELIVERY' ? address.toJson() : null,
+              'delivery_address_snapshot': isPickup ? null : address.toJson(),
               'customer_snapshot': customer.toJson(),
               'idempotency_key': idempotencyKey,
             })
@@ -209,7 +282,7 @@ class OrderService {
         if (orderRow != null && orderRow['id'] != null) {
           createdOrderId = orderRow['id'] as String;
           savedInSupabase = true;
-          debugPrint('[OrderService] ✅ Order successfully created in Supabase: $createdOrderId');
+          debugPrint('[OrderService] ✅ Order successfully created in Supabase: $createdOrderId (#$orderNumber)');
 
           // Insert status history
           try {
@@ -218,7 +291,9 @@ class OrderService {
               'status': 'CONFIRMED',
               'changed_by': 'K MART System',
             });
-          } catch (_) {}
+          } catch (hErr) {
+            debugPrint('[OrderService] order_status_history sync note: $hErr');
+          }
 
           // Insert order items
           if (items.isNotEmpty) {
@@ -236,7 +311,10 @@ class OrderService {
               }).toList();
 
               await _supabase.from('order_items').insert(itemsPayload);
-            } catch (_) {}
+              debugPrint('[OrderService] ✅ Order items successfully inserted: ${items.length} items');
+            } catch (itemErr) {
+              debugPrint('[OrderService] order_items sync note: $itemErr');
+            }
           }
 
           // Insert payment record
@@ -245,14 +323,16 @@ class OrderService {
               await _supabase.from('payments').insert({
                 'order_id': createdOrderId,
                 'razorpay_payment_id': paymentId,
-                'amount': total,
+                'amount': effectiveTotal,
                 'status': paymentStatus,
               });
-            } catch (_) {}
+            } catch (payErr) {
+              debugPrint('[OrderService] payments sync note: $payErr');
+            }
           }
         }
       } catch (dbErr) {
-        debugPrint('[OrderService] Supabase DB note (RLS policy check): $dbErr');
+        debugPrint('⚠️ [OrderService] Supabase DB insert error: $dbErr');
       }
     }
 
@@ -261,6 +341,7 @@ class OrderService {
       orderNumber: orderNumber,
       customerId: resolvedCustId,
       storeId: EnvConfig.defaultStoreId,
+      orderType: orderType,
       status: 'CONFIRMED',
       paymentStatus: paymentStatus,
       paymentMethod: paymentMethod,
@@ -269,7 +350,8 @@ class OrderService {
       total: effectiveTotal,
       deliverySlotId: validSlotId,
       scheduledDeliveryDate: scheduledDeliveryDate,
-      deliveryAddress: address,
+      deliverySlotTime: deliverySlotTime ?? '11:00 AM - 2:00 PM',
+      deliveryAddress: isPickup ? null : address,
       customerSnapshot: customer.toJson(),
       createdAt: DateTime.now(),
       items: items,

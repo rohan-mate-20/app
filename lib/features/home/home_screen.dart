@@ -14,6 +14,9 @@ import '../location/location_selector_sheet.dart';
 import '../products/product_card.dart';
 import '../search/search_screen.dart';
 import '../auth/login_screen.dart';
+import '../../providers/notification_provider.dart';
+import '../navigation/main_navigation_shell.dart';
+import '../notifications/notifications_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -115,27 +118,71 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No new notifications')),
+          Consumer<NotificationProvider>(
+            builder: (context, notifProvider, _) {
+              final unread = notifProvider.unreadCount;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      unread > 0
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_none_rounded,
+                      color: unread > 0 ? AppColors.primaryRed : AppColors.navyDark,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryRed,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.navyLight,
-              child: Text(
-                (authProvider.currentCustomer?.name?.isNotEmpty == true)
-                    ? authProvider.currentCustomer!.name!.substring(0, 1).toUpperCase()
-                    : 'SS',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.navyDark,
+            child: GestureDetector(
+              onTap: () {
+                MainNavigationShell.switchTab(context, 4);
+              },
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.navyLight,
+                child: Text(
+                  (authProvider.currentCustomer?.name?.isNotEmpty == true)
+                      ? authProvider.currentCustomer!.name!.substring(0, 1).toUpperCase()
+                      : 'K',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.navyDark,
+                  ),
                 ),
               ),
             ),
@@ -222,12 +269,12 @@ class HomeScreen extends StatelessWidget {
                       ),
                       child: Stack(
                         children: [
-                          // Background Image - Positioned appropriately for mobile vs desktop
+                          // Background Image on the right
                           Positioned(
                             right: 0,
                             top: 0,
                             bottom: 0,
-                            width: width * 0.45,
+                            width: (width - 32) * 0.42,
                             child: ClipRRect(
                               borderRadius: const BorderRadius.horizontal(
                                 right: Radius.circular(20),
@@ -242,7 +289,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
 
-                          // Gradient Overlay to ensure text readability even if image bleeds
+                          // Gradient Overlay to blend image smoothly into background
                           Positioned.fill(
                             child: Container(
                               decoration: BoxDecoration(
@@ -250,10 +297,11 @@ class HomeScreen extends StatelessWidget {
                                 gradient: LinearGradient(
                                   colors: [
                                     AppColors.navyDark,
-                                    AppColors.navyDark.withValues(alpha: 0.8),
+                                    AppColors.navyDark,
+                                    AppColors.navyDark.withValues(alpha: 0.6),
                                     Colors.transparent,
                                   ],
-                                  stops: const [0.0, 0.45, 1.0],
+                                  stops: const [0.0, 0.50, 0.65, 1.0],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
@@ -261,66 +309,77 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
 
-                          // Text Content
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Everything you need,\nRight at your doorstep.',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: width > 350 ? 18 : 16,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.15,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Fresh groceries. Daily essentials.\nHappier homes.',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const Spacer(),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const CategoriesScreen(),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primaryRed,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                          // Text Content (Constrained to left 60% so it NEVER overlaps the image)
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: (width - 32) * 0.60,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 14.0,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Everything you need,\nRight at your doorstep.',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: width > 350 ? 15 : 14,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.15,
                                     ),
                                   ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Shop Now',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Daily essentials delivered fast.',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const Spacer(),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const CategoriesScreen(),
                                         ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryRed,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 6,
                                       ),
-                                      SizedBox(width: 4),
-                                      Icon(Icons.arrow_forward, size: 14),
-                                    ],
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Shop Now',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.arrow_forward, size: 14),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -511,7 +570,7 @@ class HomeScreen extends StatelessWidget {
               // Horizontal Products ListView
               if (catalogProvider.isLoading)
                 SizedBox(
-                  height: 240,
+                  height: 245,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
@@ -519,14 +578,14 @@ class HomeScreen extends StatelessWidget {
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (_, __) => const SkeletonLoader(
                       width: 150,
-                      height: 240,
+                      height: 245,
                       borderRadius: 16,
                     ),
                   ),
                 )
               else
                 SizedBox(
-                  height: 275,
+                  height: 245,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
@@ -697,7 +756,7 @@ class HomeScreen extends StatelessWidget {
                             physics: const NeverScrollableScrollPhysics(),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
-                              childAspectRatio: width > 550 ? 0.68 : 0.62,
+                              childAspectRatio: width > 550 ? 0.72 : 0.68,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 14,
                             ),

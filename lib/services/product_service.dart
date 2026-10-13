@@ -60,9 +60,10 @@ class ProductService {
     }
   }
 
-  /// Search products with filter
+  /// Search products across whole database with fallback
   Future<List<ProductModel>> searchProducts(String query, {String? storeId}) async {
-    if (query.trim().isEmpty) return [];
+    final clean = query.trim();
+    if (clean.isEmpty) return [];
     try {
       final response = await _supabase
           .from('products')
@@ -72,15 +73,37 @@ class ProductService {
             inventory ( store_id, stock_quantity )
           ''')
           .eq('active', true)
-          .ilike('name', '%${query.trim()}%');
+          .or('name.ilike.%$clean%,description.ilike.%$clean%,brand.ilike.%$clean%')
+          .order('name', ascending: true)
+          .limit(100);
 
       final list = response as List;
       return list
           .map((item) => ProductModel.fromJson(item, storeId: storeId))
           .toList();
     } catch (e) {
-      debugPrint('[ProductService] searchProducts error: $e');
-      return [];
+      debugPrint('[ProductService] searchProducts or query error, attempting name fallback: $e');
+      try {
+        final fallback = await _supabase
+            .from('products')
+            .select('''
+              *,
+              categories ( id, name ),
+              inventory ( store_id, stock_quantity )
+            ''')
+            .eq('active', true)
+            .ilike('name', '%$clean%')
+            .order('name', ascending: true)
+            .limit(100);
+
+        final list = fallback as List;
+        return list
+            .map((item) => ProductModel.fromJson(item, storeId: storeId))
+            .toList();
+      } catch (e2) {
+        debugPrint('[ProductService] searchProducts fallback error: $e2');
+        return [];
+      }
     }
   }
 }

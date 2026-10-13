@@ -57,6 +57,7 @@ class OrdersProvider with ChangeNotifier {
     required String orderType,
     String? deliverySlotId,
     String? scheduledDeliveryDate,
+    String? deliverySlotTime,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -73,6 +74,7 @@ class OrdersProvider with ChangeNotifier {
       orderType: orderType,
       deliverySlotId: deliverySlotId,
       scheduledDeliveryDate: scheduledDeliveryDate,
+      deliverySlotTime: deliverySlotTime,
     );
 
     _isLoading = false;
@@ -98,6 +100,7 @@ class OrdersProvider with ChangeNotifier {
     required String orderType,
     String? deliverySlotId,
     String? scheduledDeliveryDate,
+    String? deliverySlotTime,
     required Function(OrderModel order) onSuccess,
     required Function(String error) onFailure,
   }) async {
@@ -149,6 +152,7 @@ class OrdersProvider with ChangeNotifier {
           orderType: orderType,
           deliverySlotId: deliverySlotId,
           scheduledDeliveryDate: scheduledDeliveryDate,
+          deliverySlotTime: deliverySlotTime,
           paymentId: res.paymentId,
         );
 

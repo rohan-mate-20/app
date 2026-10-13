@@ -190,31 +190,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   ),
 
-                  // Discount Badge
-                  if (product.discountPercent > 0)
-                    Positioned(
-                      top: 14,
-                      left: 14,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryRed,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${product.discountPercent}% OFF',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-
                   // Wishlist Button
                   Positioned(
                     top: 14,
@@ -259,15 +234,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.brand ?? 'K MART',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
                   Text(
                     product.name,
                     style: const TextStyle(
@@ -512,50 +478,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       }
                     },
                   ),
-                  const SizedBox(height: 20),
-
-                  // Free delivery banner
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.navyLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.navyDark.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Icons.local_shipping_outlined,
-                          color: AppColors.navyDark,
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Free delivery on orders above ₹2,000',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.navyDark,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              Text(
-                                'Your location is 2.4 km from K MART',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 24),
 
                   // Product Description
@@ -591,9 +513,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildSpecItem(
-                          Icons.branding_watermark_outlined,
-                          'Brand',
-                          product.brand ?? 'K MART',
+                          Icons.verified_outlined,
+                          'Quality',
+                          '100% Assured',
                         ),
                         _buildSpecItem(
                           Icons.scale_outlined,

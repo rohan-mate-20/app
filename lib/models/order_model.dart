@@ -74,7 +74,7 @@ class OrderModel {
     required this.total,
     this.deliverySlotId,
     this.scheduledDeliveryDate,
-    this.deliverySlotTime = '8:00 AM - 12:00 PM',
+    this.deliverySlotTime = '11:00 AM - 2:00 PM',
     this.deliveryAddress,
     this.customerSnapshot,
     required this.createdAt,
@@ -129,7 +129,37 @@ class OrderModel {
     );
   }
 
+  bool get isPickup {
+    final type = orderType.toUpperCase();
+    if (type == 'PICKUP' || type == 'SELF_PICKUP' || type == 'STORE_PICKUP') {
+      return true;
+    }
+    if (deliveryAddress == null && deliveryFee == 0.0) {
+      return true;
+    }
+    return false;
+  }
+
   String get displayStatus {
+    if (isPickup) {
+      switch (status.toUpperCase()) {
+        case 'CREATED':
+        case 'CONFIRMED':
+          return 'Order Confirmed';
+        case 'PREPARING':
+          return 'Preparing at Store';
+        case 'PACKED':
+        case 'DELIVERY_ASSIGNED':
+        case 'OUT_FOR_DELIVERY':
+          return 'Packed & Ready for Pickup';
+        case 'DELIVERED':
+          return 'Collected';
+        case 'CANCELLED':
+          return 'Cancelled';
+        default:
+          return status;
+      }
+    }
     switch (status.toUpperCase()) {
       case 'CREATED':
       case 'CONFIRMED':
@@ -159,9 +189,9 @@ class OrderModel {
         return 1;
       case 'DELIVERY_ASSIGNED':
       case 'OUT_FOR_DELIVERY':
-        return 2;
+        return isPickup ? 1 : 2;
       case 'DELIVERED':
-        return 3;
+        return isPickup ? 2 : 3;
       default:
         return 0;
     }
@@ -229,6 +259,7 @@ class OrderModel {
       total: tot,
       deliverySlotId: json['delivery_slot_id'],
       scheduledDeliveryDate: json['scheduled_delivery_date'],
+      deliverySlotTime: json['delivery_slot_time'] ?? json['delivery_slot'] ?? '11:00 AM - 2:00 PM',
       deliveryAddress: address,
       customerSnapshot: json['customer_snapshot'] is Map
           ? Map<String, dynamic>.from(json['customer_snapshot'])
@@ -255,6 +286,7 @@ class OrderModel {
       'total': total,
       'delivery_slot_id': deliverySlotId,
       'scheduled_delivery_date': scheduledDeliveryDate,
+      'delivery_slot_time': deliverySlotTime,
       'delivery_address_snapshot': deliveryAddress?.toJson(),
       'customer_snapshot': customerSnapshot,
       'created_at': createdAt.toIso8601String(),

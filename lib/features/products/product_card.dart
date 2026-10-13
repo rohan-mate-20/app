@@ -81,31 +81,6 @@ class ProductCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Discount Badge
-                    if (product.discountPercent > 0)
-                      Positioned(
-                        top: 4,
-                        left: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryRed,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${product.discountPercent}% OFF',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-
                     // Wishlist Heart
                     Positioned(
                       top: 2,
@@ -136,7 +111,7 @@ class ProductCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
 
-                // Product Name + Weight
+                // Product Name, Weight & Price (reduced vertical space)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,35 +137,36 @@ class ProductCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const Spacer(),
+
+                      // Price Row directly above Add Button (no gap!)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            CurrencyFormatter.format(product.sellingPrice),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (product.mrp > product.sellingPrice) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              CurrencyFormatter.format(product.mrp),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textMuted,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ),
-
-                // Price Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      CurrencyFormatter.format(product.sellingPrice),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (product.mrp > product.sellingPrice) ...[
-                      const SizedBox(width: 4),
-                      Text(
-                        CurrencyFormatter.format(product.mrp),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textMuted,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                    ],
-                  ],
                 ),
                 const SizedBox(height: 6),
 

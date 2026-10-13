@@ -112,20 +112,49 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   color: AppColors.navyDark,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getStatusBgColor(order.status),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  order.displayStatus,
-                  style: TextStyle(
-                    color: _getStatusTextColor(order.status),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+              Row(
+                children: [
+                  if (order.isPickup) ...[
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.navyDark.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.storefront_outlined, size: 12, color: AppColors.navyDark),
+                          SizedBox(width: 3),
+                          Text(
+                            'Self Pickup',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.navyDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getStatusBgColor(order.status),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      order.displayStatus,
+                      style: TextStyle(
+                        color: _getStatusTextColor(order.status),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),

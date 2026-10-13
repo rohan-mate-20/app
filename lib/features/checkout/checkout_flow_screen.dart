@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/store_delivery_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
 import '../../widgets/need_help_faq_sheet.dart';
@@ -54,6 +55,20 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
       if (mounted) {
         final ordersProvider = context.read<OrdersProvider>();
         context.read<CartProvider>().setCompletedDeliveriesCount(ordersProvider.completedDeliveriesCount);
+
+        final storeProv = context.read<StoreDeliveryProvider>();
+        if (storeProv.deliverySlots.isNotEmpty) {
+          final firstSlot = storeProv.deliverySlots.first;
+          if (storeProv.selectedSlot == null ||
+              !storeProv.deliverySlots.any((s) => s.id == storeProv.selectedSlot!.id)) {
+            storeProv.selectSlot(firstSlot);
+          }
+          if (_selectedSlotDate == null) {
+            setState(() {
+              _selectedSlotDate = storeProv.selectedSlot?.slotDate ?? firstSlot.slotDate;
+            });
+          }
+        }
       }
     });
   }
@@ -149,9 +164,19 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         orderType: _fulfillmentType,
         deliverySlotId: slot?.id,
         scheduledDeliveryDate: slot?.slotDate,
+        deliverySlotTime: slot?.timeRange,
       );
 
       if (order != null && mounted) {
+        final isPickup = _fulfillmentType == 'PICKUP';
+        context.read<NotificationProvider>().addNotification(
+          title: isPickup ? 'Self Pickup Order Confirmed! 🏪' : 'Order Placed Successfully! 🎉',
+          body: isPickup
+              ? 'Your pickup order #${order.orderNumber} for ${CurrencyFormatter.format(order.total)} has been confirmed. It will be packed at K MART store for collection!'
+              : 'Your order #${order.orderNumber} for ${CurrencyFormatter.format(order.total)} has been confirmed. Doorstep delivery guaranteed!',
+          orderId: order.id,
+          type: 'order',
+        );
         cartProvider.clearCart();
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -178,7 +203,19 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         orderType: _fulfillmentType,
         deliverySlotId: slot?.id,
         scheduledDeliveryDate: slot?.slotDate,
+        deliverySlotTime: slot?.timeRange,
         onSuccess: (OrderModel order) {
+          if (mounted) {
+            final isPickup = _fulfillmentType == 'PICKUP';
+            context.read<NotificationProvider>().addNotification(
+              title: isPickup ? 'Self Pickup Order Confirmed! 🏪' : 'Order Placed Successfully! 🎉',
+              body: isPickup
+                  ? 'Your pickup order #${order.orderNumber} for ${CurrencyFormatter.format(order.total)} has been paid and confirmed. It will be packed at K MART store for collection!'
+                  : 'Your order #${order.orderNumber} for ${CurrencyFormatter.format(order.total)} has been paid and confirmed. Doorstep delivery guaranteed!',
+              orderId: order.id,
+              type: 'order',
+            );
+          }
           cartProvider.clearCart();
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
@@ -740,8 +777,11 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
           final uniqueDates = slots.map((s) => s.slotDate).toSet().toList();
           uniqueDates.sort();
 
-          final activeDate = _selectedSlotDate ??
-              (selectedSlot?.slotDate ?? (uniqueDates.isNotEmpty ? uniqueDates.first : ''));
+          final activeDate = (_selectedSlotDate != null && uniqueDates.contains(_selectedSlotDate))
+              ? _selectedSlotDate!
+              : (selectedSlot != null && uniqueDates.contains(selectedSlot.slotDate))
+                  ? selectedSlot.slotDate
+                  : (uniqueDates.isNotEmpty ? uniqueDates.first : '');
 
           final dateSlots = slots.where((s) => s.slotDate == activeDate).toList();
           final Map<String, DeliverySlotModel> slotByName = {};
@@ -778,12 +818,16 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                       String label = dStr;
                       if (dt != null) {
                         final now = DateTime.now();
-                        if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+                        final today = DateTime(now.year, now.month, now.day);
+                        final slotDay = DateTime(dt.year, dt.month, dt.day);
+                        final diffDays = slotDay.difference(today).inDays;
+                        if (diffDays == 0) {
                           label = 'Today';
-                        } else if (dt.year == now.year && dt.month == now.month && dt.day == now.day + 1) {
+                        } else if (diffDays == 1) {
                           label = 'Tomorrow';
                         } else {
-                          label = '${dt.day}/${dt.month}';
+                          const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          label = '${weekdays[dt.weekday - 1]}, ${dt.day}/${dt.month}';
                         }
                       }
 
@@ -874,22 +918,24 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                               slot.timeRange,
                               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: slot.isAvailable ? AppColors.successLight : AppColors.warningLight,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                slot.isAvailable ? slot.feeLabel : 'Fully Booked',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: slot.isAvailable ? AppColors.successGreen : AppColors.warningOrange,
+                            if (!slot.isAvailable) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warningLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Fully Booked',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.warningOrange,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -1061,10 +1107,30 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                 children: [
                   const Icon(Icons.schedule_rounded, color: AppColors.navyDark, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Delivery Slot: Tomorrow, ${slot?.timeRange ?? '8:00 AM - 12:00 PM'}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
+                  () {
+                    String dateLabel = 'Today';
+                    if (slot != null && slot.slotDate.isNotEmpty) {
+                      final dt = DateTime.tryParse(slot.slotDate);
+                      if (dt != null) {
+                        final now = DateTime.now();
+                        final today = DateTime(now.year, now.month, now.day);
+                        final slotDay = DateTime(dt.year, dt.month, dt.day);
+                        final diffDays = slotDay.difference(today).inDays;
+                        if (diffDays == 0) {
+                          dateLabel = 'Today';
+                        } else if (diffDays == 1) {
+                          dateLabel = 'Tomorrow';
+                        } else {
+                          const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          dateLabel = '${weekdays[dt.weekday - 1]}, ${dt.day}/${dt.month}';
+                        }
+                      }
+                    }
+                    return Text(
+                      'Delivery Slot: $dateLabel, ${slot?.timeRange ?? '11:00 AM - 2:00 PM'}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    );
+                  }(),
                 ],
               ),
             ],

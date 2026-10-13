@@ -1,10 +1,10 @@
 class AppConstants {
   static const String genericProductImageFallback =
-      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
+      'https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?auto=format&fit=crop&w=600&q=80';
 
   static const Map<String, String> categoryIcons = {
     'groceries':
-        'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=150&q=80',
+        'https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?auto=format&fit=crop&w=300&q=80',
     'fruits-and-vegetables':
         'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=150&q=80',
     'dairy-and-eggs':
@@ -18,6 +18,11 @@ class AppConstants {
   };
 
   static const List<Map<String, String>> productImageFallbacks = [
+    {
+      'keywords': 'fries,french fries,yummiiez,nuggets,frozen,veg burger,patty,aloo tikki',
+      'url':
+          'https://images.unsplash.com/photo-1576107232684-1279f3908594?auto=format&fit=crop&w=600&q=80',
+    },
     {
       'keywords': 'atta,flour,wheat,grain,aashirvaad,maida,besan,suji,rava',
       'url':
@@ -121,8 +126,8 @@ class AppConstants {
   ];
 
   static const String shoppingBagImage =
-      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80';
+      'https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?auto=format&fit=crop&w=800&q=80';
 
   static const String bannerFreshEssentials =
-      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80';
+      'https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?auto=format&fit=crop&w=1200&q=80';
 }

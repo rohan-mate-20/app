@@ -87,32 +87,62 @@ class CatalogProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  List<ProductModel> get searchResults => _searchResults;
+
   void selectCategory(String slug) {
     _selectedCategorySlug = slug;
+    _searchQuery = '';
+    _searchResults.clear();
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _searchQuery = '';
+    _searchResults.clear();
+    _isLoading = false;
     notifyListeners();
   }
 
   Future<void> setSearchQuery(String query) async {
-    _searchQuery = query;
-    if (query.trim().isEmpty) {
+    final clean = query.trim();
+    _searchQuery = clean;
+    if (clean.isEmpty) {
       _searchResults.clear();
+      _isLoading = false;
       notifyListeners();
       return;
     }
     
+    // 1. Sub-second instant search on in-memory catalog
+    final q = clean.toLowerCase();
+    _searchResults = _allProducts.where((p) =>
+      p.name.toLowerCase().contains(q) ||
+      (p.brand != null && p.brand!.toLowerCase().contains(q)) ||
+      p.categoryName.toLowerCase().contains(q) ||
+      (p.description != null && p.description!.toLowerCase().contains(q))
+    ).toList();
     _isLoading = true;
     notifyListeners();
 
+    // 2. Query whole database in Supabase
     try {
-      final results = await _productService.searchProducts(query);
-      _searchResults = results;
+      final dbResults = await _productService.searchProducts(clean);
+      if (_searchQuery == clean) {
+        final existingIds = _searchResults.map((p) => p.id).toSet();
+        for (final item in dbResults) {
+          if (!existingIds.contains(item.id)) {
+            _searchResults.add(item);
+          }
+        }
+      }
     } catch (e) {
-      debugPrint('[CatalogProvider] setSearchQuery error: $e');
-      _searchResults.clear();
+      debugPrint('[CatalogProvider] remote search error: $e');
+    } finally {
+      if (_searchQuery == clean) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
-    
-    _isLoading = false;
-    notifyListeners();
   }
 
   void setSortOption(ProductSortOption option) {

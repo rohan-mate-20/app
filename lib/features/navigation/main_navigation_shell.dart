@@ -17,6 +17,18 @@ class MainNavigationShell extends StatefulWidget {
 
   const MainNavigationShell({super.key, this.initialIndex = 0});
 
+  static void switchTab(BuildContext context, int index) {
+    final state = context.findAncestorStateOfType<_MainNavigationShellState>();
+    if (state != null) {
+      state.setIndex(index);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => MainNavigationShell(initialIndex: index)),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
@@ -24,6 +36,12 @@ class MainNavigationShell extends StatefulWidget {
 class _MainNavigationShellState extends State<MainNavigationShell> {
   late int _currentIndex;
   String? _initializedCustomerId;
+
+  void setIndex(int index) {
+    if (mounted) {
+      setState(() => _currentIndex = index);
+    }
+  }
 
   final List<Widget> _screens = const [
     HomeScreen(),

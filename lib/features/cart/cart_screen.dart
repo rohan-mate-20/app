@@ -10,6 +10,8 @@ import '../../widgets/kmart_button.dart';
 import '../auth/login_screen.dart';
 import '../checkout/checkout_flow_screen.dart';
 import '../location/location_selector_sheet.dart';
+import '../navigation/main_navigation_shell.dart';
+import '../../providers/orders_provider.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -20,8 +22,36 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final authCust = context.read<AuthProvider>().currentCustomer;
+        if (authCust != null) {
+          final ordersProvider = context.read<OrdersProvider>();
+          if (ordersProvider.orders.isEmpty) {
+            ordersProvider.loadOrders(authCust.id).then((_) {
+              if (mounted) {
+                context.read<CartProvider>().setCompletedDeliveriesCount(
+                  ordersProvider.completedDeliveriesCount,
+                );
+              }
+            });
+          } else {
+            context.read<CartProvider>().setCompletedDeliveriesCount(
+              ordersProvider.completedDeliveriesCount,
+            );
+          }
+        }
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cartProvider = context.watch<CartProvider>();
+    final ordersProvider = context.watch<OrdersProvider>();
+    final pastDeliveries = ordersProvider.completedDeliveriesCount;
 
     if (cartProvider.isEmpty) {
       return Scaffold(
@@ -31,14 +61,17 @@ class _CartScreenState extends State<CartScreen> {
           message: 'Explore our wide range of groceries and essentials!',
           buttonText: 'Start Shopping',
           onButtonPressed: () {
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+            MainNavigationShell.switchTab(context, 0);
           },
         ),
       );
     }
 
-    final delFee = cartProvider.calculateDeliveryFee();
-    final totalAmount = cartProvider.calculateGrandTotal();
+    final delFee = cartProvider.calculateDeliveryFee(pastDeliveries: pastDeliveries);
+    final totalAmount = cartProvider.calculateGrandTotal(pastDeliveries: pastDeliveries);
 
     return Scaffold(
       backgroundColor: AppColors.background,

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/order_model.dart';
@@ -38,13 +38,42 @@ class OrderTrackingScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        order.displayStatus,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.navyDark,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            order.displayStatus,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.navyDark,
+                            ),
+                          ),
+                          if (order.isPickup) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.navyDark.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.storefront_outlined, size: 13, color: AppColors.navyDark),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Self Pickup',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.navyDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -69,47 +98,93 @@ class OrderTrackingScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Expected delivery: Tomorrow, 8:00 AM - 12:00 PM',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                  () {
+                    String dateLabel = 'Today';
+                    if (order.scheduledDeliveryDate != null && order.scheduledDeliveryDate!.isNotEmpty) {
+                      final dt = DateTime.tryParse(order.scheduledDeliveryDate!);
+                      if (dt != null) {
+                        final now = DateTime.now();
+                        final today = DateTime(now.year, now.month, now.day);
+                        final slotDay = DateTime(dt.year, dt.month, dt.day);
+                        final diffDays = slotDay.difference(today).inDays;
+                        if (diffDays == 0) {
+                          dateLabel = 'Today';
+                        } else if (diffDays == 1) {
+                          dateLabel = 'Tomorrow';
+                        } else {
+                          const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          dateLabel = '${weekdays[dt.weekday - 1]}, ${dt.day}/${dt.month}';
+                        }
+                      }
+                    }
+                    return Text(
+                      order.isPickup
+                          ? 'Pickup Slot: $dateLabel, ${order.deliverySlotTime ?? '11:00 AM - 2:00 PM'}'
+                          : 'Expected delivery: $dateLabel, ${order.deliverySlotTime ?? '11:00 AM - 2:00 PM'}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    );
+                  }(),
                   const SizedBox(height: 16),
 
                   // Interactive Stepper Timeline
-                  _buildTimelineItem(
-                    title: 'Order Placed & Confirmed',
-                    subtitle: 'Order received and verified',
-                    isDone: order.trackingStepIndex >= 0,
-                    isCurrent: order.trackingStepIndex == 0,
-                  ),
-                  _buildTimelineItem(
-                    title: 'Packed at Store',
-                    subtitle: 'Items picked and securely packed',
-                    isDone: order.trackingStepIndex >= 1,
-                    isCurrent: order.trackingStepIndex == 1,
-                  ),
-                  _buildTimelineItem(
-                    title: 'Out for Delivery',
-                    subtitle: 'Delivery executive is on the way',
-                    isDone: order.trackingStepIndex >= 2,
-                    isCurrent: order.trackingStepIndex == 2,
-                  ),
-                  _buildTimelineItem(
-                    title: 'Delivered to Doorstep',
-                    subtitle: 'Package handed over to customer',
-                    isDone: order.trackingStepIndex >= 3,
-                    isCurrent: order.trackingStepIndex == 3,
-                    isLast: true,
-                  ),
+                  if (order.isPickup) ...[
+                    _buildTimelineItem(
+                      title: 'Order Placed & Confirmed',
+                      subtitle: 'Order received and verified',
+                      isDone: order.trackingStepIndex >= 0,
+                      isCurrent: order.trackingStepIndex == 0,
+                    ),
+                    _buildTimelineItem(
+                      title: 'Packed & Ready for Store Pickup',
+                      subtitle: 'Items securely packed and ready for you at K MART store',
+                      isDone: order.trackingStepIndex >= 1,
+                      isCurrent: order.trackingStepIndex == 1,
+                      isLast: order.status.toUpperCase() != 'DELIVERED',
+                    ),
+                    if (order.status.toUpperCase() == 'DELIVERED')
+                      _buildTimelineItem(
+                        title: 'Collected from Store',
+                        subtitle: 'Order successfully collected by customer',
+                        isDone: true,
+                        isCurrent: true,
+                        isLast: true,
+                      ),
+                  ] else ...[
+                    _buildTimelineItem(
+                      title: 'Order Placed & Confirmed',
+                      subtitle: 'Order received and verified',
+                      isDone: order.trackingStepIndex >= 0,
+                      isCurrent: order.trackingStepIndex == 0,
+                    ),
+                    _buildTimelineItem(
+                      title: 'Packed at Store',
+                      subtitle: 'Items picked and securely packed',
+                      isDone: order.trackingStepIndex >= 1,
+                      isCurrent: order.trackingStepIndex == 1,
+                    ),
+                    _buildTimelineItem(
+                      title: 'Out for Delivery',
+                      subtitle: 'Delivery executive is on the way',
+                      isDone: order.trackingStepIndex >= 2,
+                      isCurrent: order.trackingStepIndex == 2,
+                    ),
+                    _buildTimelineItem(
+                      title: 'Delivered to Doorstep',
+                      subtitle: 'Package handed over to customer',
+                      isDone: order.trackingStepIndex >= 3,
+                      isCurrent: order.trackingStepIndex == 3,
+                      isLast: true,
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Delivery Address Card
+            // Delivery / Store Pickup Address Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -120,17 +195,17 @@ class OrderTrackingScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(
-                        Icons.location_on_outlined,
+                        order.isPickup ? Icons.storefront_outlined : Icons.location_on_outlined,
                         color: AppColors.primaryRed,
                         size: 20,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        'Delivery Address',
-                        style: TextStyle(
+                        order.isPickup ? 'Store Pickup Location' : 'Delivery Address',
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: AppColors.navyDark,
@@ -140,8 +215,9 @@ class OrderTrackingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    order.deliveryAddress?.fullAddressString ??
-                        '123, Green Park, Pune',
+                    order.isPickup
+                        ? 'K MART Baramati Central Store, Main Road, Baramati, Maharashtra'
+                        : (order.deliveryAddress?.fullAddressString ?? '123, Green Park, Pune'),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
