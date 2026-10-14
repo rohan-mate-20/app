@@ -155,6 +155,24 @@ class OrderService {
       validSlotId = null;
     }
 
+    // Auto-resolve any valid slot for DELIVERY if not specified or synthetic
+    if (!isPickup && validSlotId == null) {
+      try {
+        final anySlot = await _supabase
+            .from('delivery_slots')
+            .select('id, slot_date')
+            .order('slot_date', ascending: true)
+            .limit(1)
+            .maybeSingle();
+        if (anySlot != null && anySlot['id'] != null) {
+          validSlotId = anySlot['id'] as String;
+          if (scheduledDeliveryDate == null || scheduledDeliveryDate.isEmpty) {
+            scheduledDeliveryDate = anySlot['slot_date'] as String?;
+          }
+        }
+      } catch (_) {}
+    }
+
     // Ensure valid store ID
     String validStoreId = EnvConfig.defaultStoreId;
     try {
@@ -209,6 +227,7 @@ class OrderService {
       }
     } catch (edgeErr) {
       debugPrint('[OrderService] Note: checkout edge function: $edgeErr');
+      rethrow;
     }
 
     // 5. Try website backend API (exact endpoint used by K-MART website)

@@ -79,30 +79,37 @@ class OrdersProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    final order = await _orderService.placeOrder(
-      customer: customer,
-      address: address,
-      items: items,
-      subtotal: subtotal,
-      deliveryFee: deliveryFee,
-      total: total,
-      paymentMethod: 'COD',
-      orderType: orderType,
-      deliverySlotId: deliverySlotId,
-      scheduledDeliveryDate: scheduledDeliveryDate,
-      deliverySlotTime: deliverySlotTime,
-    );
+    try {
+      final order = await _orderService.placeOrder(
+        customer: customer,
+        address: address,
+        items: items,
+        subtotal: subtotal,
+        deliveryFee: deliveryFee,
+        total: total,
+        paymentMethod: 'COD',
+        orderType: orderType,
+        deliverySlotId: deliverySlotId,
+        scheduledDeliveryDate: scheduledDeliveryDate,
+        deliverySlotTime: deliverySlotTime,
+      );
 
-    _isLoading = false;
-    if (order != null) {
-      _activeOrder = order;
-      _orders.insert(0, order);
-    } else {
-      _errorMessage = 'Failed to place order. Please try again.';
+      _isLoading = false;
+      if (order != null) {
+        _activeOrder = order;
+        _orders.insert(0, order);
+      } else {
+        _errorMessage = 'Failed to place order. Please try again.';
+      }
+
+      notifyListeners();
+      return order;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return null;
     }
-
-    notifyListeners();
-    return order;
   }
 
   /// Place Online Razorpay Order

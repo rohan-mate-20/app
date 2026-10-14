@@ -102,7 +102,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
       setState(() => _currentStep = 2);
     } else if (_currentStep == 2) {
       final storeProvider = context.read<StoreDeliveryProvider>();
-      if (storeProvider.selectedAddress == null) {
+      if (_fulfillmentType == 'DELIVERY' && storeProvider.selectedAddress == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please select or add a delivery address'),

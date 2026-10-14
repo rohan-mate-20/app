@@ -24,6 +24,28 @@ class DeliveryService {
   }
 
   Future<List<DeliverySlotModel>> fetchDeliverySlots({String? storeId}) async {
+    try {
+      var filter = _supabase
+          .from('delivery_slots')
+          .select();
+
+      if (storeId != null && storeId.isNotEmpty) {
+        filter = filter.eq('store_id', storeId);
+      }
+
+      final response = await filter
+          .order('slot_date', ascending: true)
+          .order('start_time', ascending: true);
+
+      final list = response as List;
+      if (list.isNotEmpty) {
+        return list
+            .map((item) => DeliverySlotModel.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[DeliveryService] fetchDeliverySlots DB error: $e');
+    }
     return DeliverySlotModel.getUpcomingSlots();
   }
 }

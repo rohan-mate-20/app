@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -51,8 +52,16 @@ class CheckoutService {
       final details = fe.details;
       if (details is Map && details['error'] != null) {
         throw Exception(details['error']);
+      } else if (details is String) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map && decoded['error'] != null) {
+            throw Exception(decoded['error']);
+          }
+        } catch (_) {}
+        throw Exception(details);
       }
-      throw Exception(fe.details?.toString() ?? fe.toString());
+      throw Exception(fe.reasonPhrase ?? fe.toString());
     } catch (e) {
       debugPrint('[CheckoutService] placeOrder error: $e');
       rethrow;
