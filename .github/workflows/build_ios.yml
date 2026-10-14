@@ -1,0 +1,94 @@
+name: Build & Release iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Create a GitHub Release with this IPA?'
+        type: boolean
+        default: true
+      version_tag:
+        description: 'Release Tag (e.g., v1.0.0-ios)'
+        type: string
+        default: 'v1.0.0-ios'
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+    paths:
+      - 'lib/**'
+      - 'ios/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/build_ios.yml'
+
+permissions:
+  contents: write
+
+env:
+  LANG: 'en_US.UTF-8'
+
+jobs:
+  build-ipa:
+    name: Build iOS IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Check Flutter & Dart Version
+        run: flutter --version
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Unit Tests
+        run: flutter test
+
+      - name: Build iOS Application (No Codesign)
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package Payload into IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r -y kmart-customer.ipa Payload
+          ls -lh kmart-customer.ipa
+
+      - name: Upload IPA as GitHub Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kmart-customer-ios-ipa
+          path: kmart-customer.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: kmart-customer.ipa
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-ios' }}
+          name: "iOS Release ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-ios' }}"
+          body: |
+            ## K-MART iOS Application Release (.ipa)
+            
+            - **App Name:** K-MART Customer
+            - **Platform:** iOS (.ipa)
+            - **Packaging:** Sideloadable via Sideloadly, AltStore, or Apple Configurator.
+            
+            ### How to install on your iPhone:
+            1. Download `kmart-customer.ipa` on your computer.
+            2. Connect your iPhone via USB.
+            3. Open **Sideloadly** or **AltStore**, select `kmart-customer.ipa`, and install with your Apple ID.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
