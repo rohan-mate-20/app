@@ -53,15 +53,23 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
+      - name: Setup CocoaPods
+        run: |
+          cd ios
+          pod install || true
+          cd ..
+
       - name: Build iOS Application (No Codesign)
         run: |
           flutter build ios --release --no-codesign
 
       - name: Package Payload into IPA
         run: |
+          cd build/ios/iphoneos
           mkdir -p Payload
-          cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r -y kmart-customer.ipa Payload
+          cp -r Runner.app Payload/
+          zip -r -y ../../../kmart-customer.ipa Payload
+          cd ../../..
           ls -lh kmart-customer.ipa
 
       - name: Upload IPA as GitHub Actions Artifact
