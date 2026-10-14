@@ -98,20 +98,23 @@ class StoreDeliveryProvider with ChangeNotifier {
       } else {
         final prefs = await SharedPreferences.getInstance();
         final savedName = prefs.getString('kmart_saved_customer_name');
-        final defaultPune = AddressModel(
-          id: 'addr_default_pune',
+        final defaultBaramati = AddressModel(
+          id: 'addr_default_baramati',
           customerId: customerId,
           label: 'Home',
           fullName: (savedName != null && savedName.isNotEmpty) ? savedName : 'Customer',
           phone: '9876543210',
-          line1: 'A-302, Green Park Apartments',
-          line2: 'Baner Road',
-          city: 'Pune',
+          line1: 'Near K MART Store, Yashwant Nagar',
+          line2: 'Baramati - Nira Rd',
+          city: 'Baramati',
           state: 'Maharashtra',
-          pincode: '411045',
+          pincode: '413102',
+          latitude: 18.1508,
+          longitude: 74.5779,
           isDefault: true,
         );
-        _selectedAddress = defaultPune;
+        _addresses = [defaultBaramati];
+        _selectedAddress = defaultBaramati;
       }
       notifyListeners();
     } catch (e) {

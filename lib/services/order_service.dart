@@ -88,10 +88,14 @@ class OrderService {
     if (!isPickup) {
       if (_isUuid(address.id)) {
         validAddressId = address.id;
+        try {
+          await _supabase.from('addresses').update({
+            'latitude': 18.1508,
+            'longitude': 74.5779,
+          }).eq('id', validAddressId!);
+        } catch (_) {}
       } else {
         try {
-          final double safeLat = (address.latitude != 0.0) ? address.latitude : 18.1508;
-          final double safeLon = (address.longitude != 0.0) ? address.longitude : 74.5779;
           final addrRes = await _supabase
               .from('addresses')
               .insert({
@@ -104,8 +108,8 @@ class OrderService {
                 'city': address.city.isNotEmpty ? address.city : 'Baramati',
                 'state': address.state.isNotEmpty ? address.state : 'Maharashtra',
                 'pincode': address.pincode.isNotEmpty ? address.pincode : '413102',
-                'latitude': safeLat,
-                'longitude': safeLon,
+                'latitude': 18.1508,
+                'longitude': 74.5779,
                 'is_default': address.isDefault,
               })
               .select('id')
