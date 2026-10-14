@@ -21,6 +21,7 @@ on:
       - 'ios/**'
       - 'assets/**'
       - 'pubspec.yaml'
+      - 'pubspec.lock'
       - '.github/workflows/build_ios.yml'
 
 permissions:
