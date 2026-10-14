@@ -7,8 +7,38 @@ import 'supabase_service.dart';
 class CartService {
   SupabaseClient get _supabase => SupabaseService.client;
 
+  /// Requirement 1: Right before a cart write, log: await supabase.auth.getUser().
+  /// If there is no user, the customer is not logged in as far as Supabase is concerned.
+  Future<User?> _verifyAuthUserBeforeWrite(String operation) async {
+    try {
+      final userRes = await _supabase.auth.getUser();
+      final user = userRes.user ?? _supabase.auth.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ [CartService] $operation: No user logged in! Supabase auth session is missing.');
+        return null;
+      }
+      debugPrint('ℹ️ [CartService] $operation: Authenticated user id: ${user.id}');
+      return user;
+    } on AuthException catch (ae) {
+      debugPrint('❌ [CartService] $operation AuthException: code=${ae.statusCode}, message=${ae.message}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ [CartService] $operation auth error: $e');
+      return null;
+    }
+  }
+
+  /// Look up or create a cart for the customer in Supabase `carts` table
+  /// Requirement 4: Uses customer's own customers.id
   Future<String?> getOrCreateCartId(String customerId) async {
     if (customerId.isEmpty) return null;
+
+    final user = await _verifyAuthUserBeforeWrite('getOrCreateCartId');
+    if (user == null) {
+      debugPrint('❌ [CartService] Cannot write cart: customer is not logged in with Supabase.');
+      throw Exception('Customer is not logged in as far as Supabase is concerned.');
+    }
+
     try {
       final existing = await _supabase
           .from('carts')
@@ -27,9 +57,12 @@ class CartService {
           .single();
 
       return created['id'] as String;
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [CartService] getOrCreateCartId PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+      rethrow;
     } catch (e) {
-      debugPrint('[CartService] getOrCreateCartId error: $e');
-      return null;
+      debugPrint('❌ [CartService] getOrCreateCartId error: $e');
+      rethrow;
     }
   }
 
@@ -61,14 +94,20 @@ class CartService {
         }
       }
       return items;
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [CartService] loadCartItems PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+      return [];
     } catch (e) {
-      debugPrint('[CartService] loadCartItems error: $e');
+      debugPrint('❌ [CartService] loadCartItems error: $e');
+      return [];
     }
-    return [];
   }
 
   Future<void> syncCartItem(String cartId, String productId, int quantity) async {
     if (cartId.isEmpty || productId.isEmpty) return;
+
+    await _verifyAuthUserBeforeWrite('syncCartItem');
+
     try {
       if (quantity <= 0) {
         await _supabase
@@ -86,39 +125,61 @@ class CartService {
           onConflict: 'cart_id,product_id',
         );
       }
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [CartService] syncCartItem PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+      rethrow;
     } catch (e) {
-      debugPrint('[CartService] syncCartItem error: $e');
+      debugPrint('❌ [CartService] syncCartItem error: $e');
+      rethrow;
     }
   }
 
   Future<void> clearCart(String cartId) async {
     if (cartId.isEmpty) return;
+
+    await _verifyAuthUserBeforeWrite('clearCart');
+
     try {
       await _supabase.from('cart_items').delete().eq('cart_id', cartId);
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [CartService] clearCart PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
     } catch (e) {
-      debugPrint('[CartService] clearCart error: $e');
+      debugPrint('❌ [CartService] clearCart error: $e');
     }
   }
 
-  /// Synchronize all local cart items to the database cart_items table
+  /// Synchronize local cart items directly to the database cart_items table
   Future<void> syncCartToDatabase({
     required String cartId,
     required List<Map<String, dynamic>> items,
   }) async {
     if (cartId.isEmpty) return;
+
+    final user = await _verifyAuthUserBeforeWrite('syncCartToDatabase');
+    if (user == null) {
+      throw Exception('Customer is not logged in as far as Supabase is concerned.');
+    }
+
     try {
       await _supabase.from('cart_items').delete().eq('cart_id', cartId);
       if (items.isEmpty) return;
       final rows = items
           .map((item) => {
                 'cart_id': cartId,
-                'product_id': item['productId'],
-                'quantity': item['quantity'],
+                'product_id': (item['productId'] ?? item['product_id'] ?? item['id'] ?? '').toString().trim(),
+                'quantity': item['quantity'] ?? 1,
               })
+          .where((r) => (r['product_id'] as String).isNotEmpty)
           .toList();
-      await _supabase.from('cart_items').insert(rows);
+      if (rows.isNotEmpty) {
+        await _supabase.from('cart_items').insert(rows);
+      }
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [CartService] syncCartToDatabase PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+      rethrow;
     } catch (e) {
-      debugPrint('[CartService] syncCartToDatabase note: $e');
+      debugPrint('❌ [CartService] syncCartToDatabase error: $e');
+      rethrow;
     }
   }
 }

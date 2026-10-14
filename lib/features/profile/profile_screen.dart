@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../location/address_management_screen.dart';
-import '../orders/orders_screen.dart';
 import '../../widgets/need_help_faq_sheet.dart';
 import '../auth/login_screen.dart';
 import '../legal/terms_and_privacy_screen.dart';
@@ -158,19 +157,6 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildMenuItem(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'My Orders',
-                    subtitle: 'Track, view or reorder items',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const OrdersScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
                   _buildMenuItem(
                     icon: Icons.location_on_outlined,
                     title: 'Delivery Addresses',

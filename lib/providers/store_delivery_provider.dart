@@ -5,6 +5,7 @@ import '../models/delivery_settings_model.dart';
 import '../models/delivery_slot_model.dart';
 import '../services/store_service.dart';
 import '../services/delivery_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/address_service.dart';
 
 class StoreDeliveryProvider with ChangeNotifier {
@@ -26,16 +27,18 @@ class StoreDeliveryProvider with ChangeNotifier {
   bool _isLoading = false;
 
   static final AddressModel defaultSampleAddress = AddressModel(
-    id: 'addr_default_pune',
+    id: 'addr_default_baramati',
     customerId: 'guest_user',
     label: 'Home',
     fullName: 'Customer',
     phone: '9876543210',
-    line1: 'A-302, Green Park Apartments',
-    line2: 'Baner Road',
-    city: 'Pune',
+    line1: 'Near K MART Store, Yashwant Nagar',
+    line2: 'Baramati - Nira Rd',
+    city: 'Baramati',
     state: 'Maharashtra',
-    pincode: '411045',
+    pincode: '413102',
+    latitude: 18.1508,
+    longitude: 74.5779,
     isDefault: true,
   );
 
@@ -93,12 +96,13 @@ class StoreDeliveryProvider with ChangeNotifier {
           orElse: () => list.first,
         );
       } else {
-        // Create default Pune sample address if brand new user
+        final prefs = await SharedPreferences.getInstance();
+        final savedName = prefs.getString('kmart_saved_customer_name');
         final defaultPune = AddressModel(
           id: 'addr_default_pune',
           customerId: customerId,
           label: 'Home',
-          fullName: 'Customer',
+          fullName: (savedName != null && savedName.isNotEmpty) ? savedName : 'Customer',
           phone: '9876543210',
           line1: 'A-302, Green Park Apartments',
           line2: 'Baner Road',

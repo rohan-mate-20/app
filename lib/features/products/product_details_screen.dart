@@ -549,21 +549,21 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       const SizedBox(height: 12),
                       if (_isLoadingRelated)
                         SizedBox(
-                          height: 275,
+                          height: 320,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: 5,
                             separatorBuilder: (_, __) => const SizedBox(width: 12),
                             itemBuilder: (_, __) => const SkeletonLoader(
                               width: 160,
-                              height: 275,
+                              height: 320,
                               borderRadius: 16,
                             ),
                           ),
                         )
                       else if (_relatedProducts.isNotEmpty)
                         SizedBox(
-                          height: 275,
+                          height: 320,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: _relatedProducts.length,

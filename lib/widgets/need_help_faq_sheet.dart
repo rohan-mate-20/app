@@ -27,17 +27,12 @@ class NeedHelpFaqSheet extends StatelessWidget {
     {
       'question': 'What are the delivery charges?',
       'answer':
-          'Delivery charges depend on your order value and applicable delivery eligibility. Orders worth ₹500 to below ₹1,000 have a ₹40 delivery charge, while orders worth ₹1,000 or more have a ₹30 delivery charge. Eligible customers receive free delivery on their first three qualifying deliveries. Orders below ₹500 follow the applicable existing delivery fee.',
+          'Delivery charges depend on your order value: Orders below ₹1,000 have a ₹40 delivery charge, while orders worth ₹1,000 or more have a ₹30 delivery charge. Store pickup orders are completely FREE.',
     },
     {
       'question': 'Can I collect my order myself?',
       'answer':
           'Yes, if pickup is available for your order and selected store. Choose Pickup during checkout. Delivery charges will not apply to pickup orders.',
-    },
-    {
-      'question': 'How can I cancel my order?',
-      'answer':
-          'Open My Orders, select the relevant order, and use the cancellation option if it is available for that order\'s current status. Cancellation remains subject to the existing cancellation rules.',
     },
     {
       'question': 'What payment methods are available?',
@@ -52,7 +47,7 @@ class NeedHelpFaqSheet extends StatelessWidget {
     {
       'question': 'How can I contact customer support?',
       'answer':
-          'Use the existing customer support or contact option available in the app. Toll-Free: 1800-123-KMART | Email: support@kmartgrocery.com (7:00 AM - 10:00 PM Daily).',
+          'Contact our customer support directly at +91 99750 40003.',
     },
   ];
 

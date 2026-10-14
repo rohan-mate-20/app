@@ -52,91 +52,76 @@ class OrderService {
     final effectiveDeliveryFee = isPickup ? 0.0 : deliveryFee;
     final effectiveTotal = subtotal + effectiveDeliveryFee + DeliveryPricingService.handlingFee + DeliveryPricingService.platformFee;
 
-    // 1. Ensure valid UUID for customer_id
-    String resolvedCustId = _isUuid(customer.id) ? customer.id : const Uuid().v4();
+    // Requirement 1: Verify auth user before database operations
+    final userRes = await _supabase.auth.getUser();
+    final authUser = userRes.user ?? _supabase.auth.currentUser;
+    if (authUser == null) {
+      debugPrint('❌ [OrderService] No authenticated user found with Supabase.');
+      throw Exception('Customer is not logged in as far as Supabase is concerned. Please login with OTP first.');
+    }
 
-    // Try to ensure customer row in Supabase so foreign key passes
+    // Requirement 2: customer_id must be customers.id, looked up with:
+    // select id from customers where auth_user_id = <auth user id>.
+    // Never use the auth user id itself as customer_id.
+    String customerId;
     try {
-      String cleanPhone = customer.phone.replaceAll(RegExp(r'\D'), '');
-      if (cleanPhone.length == 12 && cleanPhone.startsWith('91')) {
-        cleanPhone = cleanPhone.substring(2);
-      }
-      if (cleanPhone.isNotEmpty) {
-        final existing = await _supabase
-            .from('customers')
-            .select('id')
-            .or('phone.eq.$cleanPhone,phone.eq.+91$cleanPhone,phone.eq.91$cleanPhone')
-            .maybeSingle();
+      final custRes = await _supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', authUser.id)
+          .maybeSingle();
 
-        if (existing != null && existing['id'] != null) {
-          resolvedCustId = existing['id'] as String;
-        } else {
-          final inserted = await _supabase
-              .from('customers')
+      if (custRes != null && custRes['id'] != null) {
+        customerId = custRes['id'] as String;
+        debugPrint('ℹ️ [OrderService] Found customer record: customers.id=$customerId for auth_user_id=${authUser.id}');
+      } else {
+        debugPrint('❌ [OrderService] No customers row found where auth_user_id = ${authUser.id}');
+        throw Exception('Customer row not found for logged in user. Please log out and log in again.');
+      }
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [OrderService] Lookup customer PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+      rethrow;
+    }
+
+    // Requirement 4: Addresses written directly with the customer's own customers.id
+    String? validAddressId;
+    if (!isPickup) {
+      if (_isUuid(address.id)) {
+        validAddressId = address.id;
+      } else {
+        try {
+          final double safeLat = (address.latitude != 0.0) ? address.latitude : 18.1508;
+          final double safeLon = (address.longitude != 0.0) ? address.longitude : 74.5779;
+          final addrRes = await _supabase
+              .from('addresses')
               .insert({
-                'id': resolvedCustId,
-                'phone': cleanPhone,
-                'name': (customer.name != null && customer.name!.isNotEmpty) ? customer.name : 'Customer',
-                'email': customer.email,
+                'customer_id': customerId,
+                'label': address.label,
+                'full_name': address.fullName,
+                'phone': address.phone,
+                'line1': address.line1,
+                'line2': address.line2,
+                'city': address.city.isNotEmpty ? address.city : 'Baramati',
+                'state': address.state.isNotEmpty ? address.state : 'Maharashtra',
+                'pincode': address.pincode.isNotEmpty ? address.pincode : '413102',
+                'latitude': safeLat,
+                'longitude': safeLon,
+                'is_default': address.isDefault,
               })
               .select('id')
-              .maybeSingle();
-          if (inserted != null && inserted['id'] != null) {
-            resolvedCustId = inserted['id'] as String;
+              .single();
+
+          if (addrRes['id'] != null) {
+            validAddressId = addrRes['id'] as String;
           }
+        } on PostgrestException catch (pe) {
+          debugPrint('❌ [OrderService] Address insert PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+          rethrow;
         }
-      }
-    } catch (custErr) {
-      debugPrint('[OrderService] Note: Customer table sync: $custErr');
-    }
-
-    // Safety fallback: if customer_id is not in customers table, try any existing customer to pass FK
-    try {
-      final custCheck = await _supabase.from('customers').select('id').eq('id', resolvedCustId).maybeSingle();
-      if (custCheck == null) {
-        final anyCust = await _supabase.from('customers').select('id').limit(1).maybeSingle();
-        if (anyCust != null && anyCust['id'] != null) {
-          resolvedCustId = anyCust['id'] as String;
-        }
-      }
-    } catch (_) {}
-
-    // 2. Ensure valid address in Supabase with Store service area coordinates
-    String validAddressId = address.id;
-    final double safeLat = (address.latitude != 0.0) ? address.latitude : 18.5300;
-    final double safeLon = (address.longitude != 0.0) ? address.longitude : 73.8700;
-
-    if (_isUuid(validAddressId)) {
-      // already valid UUID
-    } else {
-      try {
-        final addrRes = await _supabase
-            .from('addresses')
-            .insert({
-              'customer_id': resolvedCustId,
-              'label': address.label,
-              'full_name': address.fullName,
-              'phone': address.phone,
-              'line1': address.line1,
-              'line2': address.line2,
-              'city': address.city.isNotEmpty ? address.city : 'Pune',
-              'state': address.state.isNotEmpty ? address.state : 'Maharashtra',
-              'pincode': address.pincode.isNotEmpty ? address.pincode : '411001',
-              'latitude': safeLat,
-              'longitude': safeLon,
-              'is_default': address.isDefault,
-            })
-            .select('id')
-            .maybeSingle();
-        if (addrRes != null && addrRes['id'] != null) {
-          validAddressId = addrRes['id'] as String;
-        }
-      } catch (addrErr) {
-        debugPrint('[OrderService] Address table sync note: $addrErr');
       }
     }
 
-    // 3. Ensure valid delivery slot (prevent FK error if slot doesn't exist)
+    // Delivery Slot resolution
     String? validSlotId = isPickup ? null : deliverySlotId;
     if (validSlotId != null && _isUuid(validSlotId)) {
       try {
@@ -145,9 +130,7 @@ class OrderService {
             .select('id')
             .eq('id', validSlotId)
             .maybeSingle();
-        if (slotRes == null) {
-          validSlotId = null;
-        }
+        if (slotRes == null) validSlotId = null;
       } catch (_) {
         validSlotId = null;
       }
@@ -155,7 +138,6 @@ class OrderService {
       validSlotId = null;
     }
 
-    // Auto-resolve any valid slot for DELIVERY if not specified or synthetic
     if (!isPickup && validSlotId == null) {
       try {
         final anySlot = await _supabase
@@ -173,7 +155,7 @@ class OrderService {
       } catch (_) {}
     }
 
-    // Ensure valid store ID
+    // Resolve store ID
     String validStoreId = EnvConfig.defaultStoreId;
     try {
       final storeCheck = await _supabase.from('stores').select('id').eq('id', validStoreId).maybeSingle();
@@ -185,181 +167,57 @@ class OrderService {
       }
     } catch (_) {}
 
-    // 4. Try checkout Edge Function (Official K MART checkout engine)
-    String createdOrderId = const Uuid().v4();
-    bool savedInSupabase = false;
-
-    try {
-      // Step 3: Sync Cart to DB (carts & cart_items tables)
-      final dbCartId = await _cartService.getOrCreateCartId(resolvedCustId);
-      if (dbCartId != null && items.isNotEmpty) {
-        await _cartService.syncCartToDatabase(
-          cartId: dbCartId,
-          items: items
-              .map((it) => {
-                    'productId': it.product.id,
-                    'quantity': it.quantity,
-                  })
-              .toList(),
-        );
-      }
-
-      // Step 4: Call Edge Function via CheckoutService
-      final edgeData = await _checkoutService.placeOrder(
-        customerId: resolvedCustId,
-        orderType: orderType,
-        pickupStoreId: orderType == 'PICKUP' ? validStoreId : null,
-        addressId: orderType == 'DELIVERY' ? validAddressId : null,
-        deliverySlotId: orderType == 'DELIVERY' ? validSlotId : null,
-        scheduledDate: orderType == 'DELIVERY' ? scheduledDeliveryDate : null,
-        paymentMethod: paymentMethod == 'COD' ? 'COD' : 'ONLINE',
-        idempotencyKey: idempotencyKey,
+    // Requirement 4: Carts and cart items are written directly with customer's own customers.id
+    final dbCartId = await _cartService.getOrCreateCartId(customerId);
+    if (dbCartId != null && items.isNotEmpty) {
+      await _cartService.syncCartToDatabase(
+        cartId: dbCartId,
+        items: items
+            .map((it) => {
+                  'productId': it.product.id,
+                  'quantity': it.quantity,
+                })
+            .toList(),
       );
-
-      if (edgeData['order'] != null) {
-        final dbOrder = edgeData['order'];
-        createdOrderId = dbOrder['id']?.toString() ?? createdOrderId;
-        if (dbOrder['order_number'] != null) {
-          orderNumber = dbOrder['order_number'].toString();
-        }
-        savedInSupabase = true;
-        debugPrint('[OrderService] ✅ Order successfully created via Supabase Edge Function checkout: $createdOrderId (#$orderNumber)');
-      }
-    } catch (edgeErr) {
-      debugPrint('[OrderService] Note: checkout edge function: $edgeErr');
-      rethrow;
     }
 
-    // 5. Try website backend API (exact endpoint used by K-MART website)
-    if (!savedInSupabase) {
-      try {
-        final url = Uri.parse('${EnvConfig.backendBaseUrl}/api/orders');
-        final resp = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'orderNumber': orderNumber,
-            'customerId': resolvedCustId,
-            'storeId': validStoreId,
-            'items': items.map((it) => {
-              'product': {
-                'id': it.product.id,
-                'name': it.product.name,
-                'sellingPrice': it.product.sellingPrice,
-                'mrp': it.product.mrp,
-              },
-              'quantity': it.quantity,
-            }).toList(),
-            'subtotal': subtotal,
-            'deliveryFee': effectiveDeliveryFee,
-            'total': effectiveTotal,
-            'deliverySlotId': isPickup ? null : validSlotId,
-            'scheduledDeliveryDate': scheduledDeliveryDate,
-            'deliveryAddressSnapshot': isPickup ? null : address.toJson(),
-            'customerSnapshot': customer.toJson(),
-            'paymentMethod': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
-          }),
-        ).timeout(const Duration(seconds: 8));
-
-        if (resp.statusCode == 200) {
-          final resJson = jsonDecode(resp.body);
-          if (resJson['success'] == true && resJson['orderId'] != null) {
-            createdOrderId = resJson['orderId'].toString();
-            savedInSupabase = true;
-            debugPrint('[OrderService] ✅ Order successfully created via website backend API: $createdOrderId (#$orderNumber)');
-          }
-        }
-      } catch (apiErr) {
-        debugPrint('[OrderService] Website API note: $apiErr');
-      }
-    }
-
-    // 6. Fallback: Direct Supabase insertion
-    if (!savedInSupabase) {
-      try {
-        final orderRow = await _supabase
-            .from('orders')
-            .insert({
-              'order_number': orderNumber,
-              'customer_id': resolvedCustId,
-              'store_id': validStoreId,
-              'order_type': orderType,
-              'status': 'CONFIRMED',
-              'payment_status': paymentStatus,
-              'payment_method': paymentMethod == 'COD' ? 'COD' : 'ONLINE',
-              'subtotal': subtotal,
-              'delivery_fee': effectiveDeliveryFee,
-              'total': effectiveTotal,
-              'delivery_slot_id': isPickup ? null : validSlotId,
-              'scheduled_delivery_date': scheduledDeliveryDate,
-              'delivery_address_snapshot': isPickup ? null : address.toJson(),
-              'customer_snapshot': customer.toJson(),
-              'idempotency_key': idempotencyKey,
-            })
-            .select()
-            .maybeSingle();
-
-        if (orderRow != null && orderRow['id'] != null) {
-          createdOrderId = orderRow['id'] as String;
-          savedInSupabase = true;
-          debugPrint('[OrderService] ✅ Order successfully created in Supabase: $createdOrderId (#$orderNumber)');
-
-          // Insert status history
-          try {
-            await _supabase.from('order_status_history').insert({
-              'order_id': createdOrderId,
-              'status': 'CONFIRMED',
-              'changed_by': 'K MART System',
-            });
-          } catch (hErr) {
-            debugPrint('[OrderService] order_status_history sync note: $hErr');
-          }
-
-          // Insert order items
-          if (items.isNotEmpty) {
-            try {
-              final itemsPayload = items.map((it) => {
-                'order_id': createdOrderId,
-                'product_id': it.product.id,
-                'product_name': it.product.name,
+    // Requirement 3: Orders are created ONLY by supabase.functions.invoke('checkout', ...)
+    // Never insert into customers, orders, order_items, order_status_history or payments from client.
+    String createdOrderId = const Uuid().v4();
+    final edgeData = await _checkoutService.placeOrder(
+      customerId: customerId,
+      orderType: orderType,
+      pickupStoreId: isPickup ? validStoreId : null,
+      addressId: isPickup ? null : validAddressId,
+      deliverySlotId: isPickup ? null : validSlotId,
+      scheduledDate: isPickup ? null : scheduledDeliveryDate,
+      paymentMethod: paymentMethod == 'COD' ? 'COD' : 'ONLINE',
+      idempotencyKey: idempotencyKey,
+      items: items
+          .map((it) => {
+                'productId': it.product.id,
                 'quantity': it.quantity,
-                'unit_mrp': it.product.mrp,
-                'unit_selling_price': it.product.sellingPrice,
-                'tax': 0,
-                'line_total': it.lineTotal,
-                'is_available': true,
-              }).toList();
+                'unitPrice': it.product.sellingPrice,
+                'productName': it.product.name,
+              })
+          .toList(),
+    );
 
-              await _supabase.from('order_items').insert(itemsPayload);
-              debugPrint('[OrderService] ✅ Order items successfully inserted: ${items.length} items');
-            } catch (itemErr) {
-              debugPrint('[OrderService] order_items sync note: $itemErr');
-            }
-          }
-
-          // Insert payment record
-          if (paymentMethod != 'COD' || paymentId != null) {
-            try {
-              await _supabase.from('payments').insert({
-                'order_id': createdOrderId,
-                'razorpay_payment_id': paymentId,
-                'amount': effectiveTotal,
-                'status': paymentStatus,
-              });
-            } catch (payErr) {
-              debugPrint('[OrderService] payments sync note: $payErr');
-            }
-          }
-        }
-      } catch (dbErr) {
-        debugPrint('⚠️ [OrderService] Supabase DB insert error: $dbErr');
+    final dbOrder = edgeData['order'];
+    if (dbOrder != null) {
+      createdOrderId = dbOrder['id']?.toString() ?? createdOrderId;
+      if (dbOrder['order_number'] != null) {
+        orderNumber = dbOrder['order_number'].toString();
       }
+      debugPrint('[OrderService] ✅ Order successfully created by Supabase Edge Function checkout: $createdOrderId (#$orderNumber)');
+    } else {
+      debugPrint('⚠️ [OrderService] Edge Function returned without order object: $edgeData');
     }
 
     final finalOrder = OrderModel(
       id: createdOrderId,
       orderNumber: orderNumber,
-      customerId: resolvedCustId,
+      customerId: customerId,
       storeId: EnvConfig.defaultStoreId,
       orderType: orderType,
       status: 'CONFIRMED',
@@ -390,7 +248,7 @@ class OrderService {
     // Save order in local cache
     await _saveLocalOrder(finalOrder);
 
-    debugPrint('[OrderService] Order completed (DB saved: $savedInSupabase): $orderNumber');
+    debugPrint('[OrderService] Order placed via Supabase Edge Function: $orderNumber (ID: $createdOrderId)');
     return finalOrder;
   }
 

@@ -383,7 +383,9 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                           );
                         }(),
                         Text(
-                          order.deliverySlotTime ?? '11:00 AM - 2:00 PM',
+                          order.deliverySlotTime.isNotEmpty
+                              ? order.deliverySlotTime
+                              : '11:00 AM - 2:00 PM',
                           style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,

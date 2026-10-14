@@ -11,6 +11,8 @@ class AuthService {
   final SupabaseClient _supabase = SupabaseService.client;
   static const String _prefKeyCachedCustomer = 'kmart_cached_customer';
 
+  static const String _prefKeyCustomerName = 'kmart_saved_customer_name';
+
   /// Send OTP to Indian phone number
   Future<bool> sendOtp(String phone) async {
     final normalized = Validators.normalizeIndianMobile(phone);
@@ -25,7 +27,7 @@ class AuthService {
   }
 
   /// Verify OTP code
-  Future<AuthResponse?> verifyOtp(String phone, String otp) async {
+  Future<AuthResponse> verifyOtp(String phone, String otp) async {
     final normalized = Validators.normalizeIndianMobile(phone);
     try {
       final response = await _supabase.auth.verifyOTP(
@@ -34,13 +36,73 @@ class AuthService {
         type: OtpType.sms,
       );
       return response;
+    } on AuthException catch (ae) {
+      debugPrint('❌ [AuthService] verifyOTP AuthException: code=${ae.statusCode}, message=${ae.message}');
+      rethrow;
     } catch (e) {
-      debugPrint('[AuthService] verifyOtp note: $e');
+      debugPrint('❌ [AuthService] verifyOtp error: $e');
+      rethrow;
+    }
+  }
+
+  /// Look up customer in Supabase `customers` table where auth_user_id = <auth user id>
+  /// Requirement 2 & 3: Never use auth user id itself as customer_id.
+  /// Never insert into customers from the client; row is created by database trigger at login.
+  Future<CustomerModel?> lookupCustomerByAuthUserId(String authUserId, {String? fallbackPhone}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveName = prefs.getString(_prefKeyCustomerName);
+
+    try {
+      final res = await _supabase
+          .from('customers')
+          .select('id, name, phone, email, auth_user_id')
+          .eq('auth_user_id', authUserId)
+          .maybeSingle();
+
+      if (res != null && res['id'] != null) {
+        final cust = CustomerModel.fromJson(res).copyWith(
+          name: (effectiveName != null && effectiveName.isNotEmpty && effectiveName != 'Customer')
+              ? effectiveName
+              : (res['name'] != null && res['name'].toString().isNotEmpty)
+                  ? res['name'].toString()
+                  : 'Customer',
+          isVerified: true,
+        );
+        await _cacheCustomer(cust);
+        return cust;
+      }
+
+      // If DB trigger creation was slightly delayed, retry by phone if provided
+      if (fallbackPhone != null && fallbackPhone.isNotEmpty) {
+        final cleanPhone = fallbackPhone.replaceAll(RegExp(r'\D'), '');
+        final phoneQuery = cleanPhone.length == 10 ? cleanPhone : fallbackPhone;
+        final phoneRes = await _supabase
+            .from('customers')
+            .select('id, name, phone, email, auth_user_id')
+            .eq('phone', phoneQuery)
+            .maybeSingle();
+
+        if (phoneRes != null && phoneRes['id'] != null) {
+          final cust = CustomerModel.fromJson(phoneRes).copyWith(
+            name: (effectiveName != null && effectiveName.isNotEmpty) ? effectiveName : phoneRes['name'],
+            isVerified: true,
+          );
+          await _cacheCustomer(cust);
+          return cust;
+        }
+      }
+
+      return null;
+    } on PostgrestException catch (pe) {
+      debugPrint('❌ [AuthService] lookupCustomer PostgrestException: code=${pe.code}, message=${pe.message}, details=${pe.details}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ [AuthService] lookupCustomer error: $e');
       return null;
     }
   }
 
-  /// Look up or insert customer by phone in Supabase `customers` table
+  /// Backward compatible wrapper that looks up existing customer and optionally updates profile
   Future<CustomerModel> upsertCustomer({
     required String phone,
     String? name,
@@ -49,96 +111,65 @@ class AuthService {
     String? dob,
     bool whatsappOptIn = true,
   }) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    final phoneQuery = cleanPhone.length == 10 ? cleanPhone : phone;
-    String? resolvedAuthId = authUserId ?? _supabase.auth.currentUser?.id;
+    final resolvedAuthId = authUserId ?? _supabase.auth.currentUser?.id;
+    if (resolvedAuthId != null && resolvedAuthId.isNotEmpty) {
+      final found = await lookupCustomerByAuthUserId(resolvedAuthId, fallbackPhone: phone);
+      if (found != null) {
+        if (name != null && name.isNotEmpty && name != 'Customer') {
+          try {
+            await _supabase.from('customers').update({'name': name}).eq('id', found.id);
+          } catch (_) {}
+          return found.copyWith(name: name);
+        }
+        return found;
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveName = (name != null && name.trim().isNotEmpty && name.trim() != 'Customer')
+        ? name.trim()
+        : prefs.getString(_prefKeyCustomerName) ?? 'Customer';
+
+    final fallback = CustomerModel(
+      id: resolvedAuthId ?? '',
+      phone: phone,
+      name: effectiveName,
+      email: email,
+      authUserId: resolvedAuthId,
+      dob: dob,
+      whatsappOptIn: whatsappOptIn,
+      isVerified: true,
+    );
+    await _cacheCustomer(fallback);
+    return fallback;
+  }
+
+  Future<void> updateCustomerName({
+    required String phone,
+    required String name,
+    String? customerId,
+  }) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty || cleanName == 'Customer') return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKeyCustomerName, cleanName);
 
     try {
-      // 1. Try to find existing customer by auth_user_id or phone
-      Map<String, dynamic>? existing;
-      if (resolvedAuthId != null && resolvedAuthId.isNotEmpty) {
-        final res = await _supabase
-            .from('customers')
-            .select()
-            .eq('auth_user_id', resolvedAuthId)
-            .maybeSingle();
-        if (res != null) existing = res;
+      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+      final phoneQuery = cleanPhone.length == 10 ? cleanPhone : phone;
+      if (customerId != null && customerId.isNotEmpty) {
+        await _supabase.from('customers').update({'name': cleanName}).eq('id', customerId);
+      } else {
+        await _supabase.from('customers').update({'name': cleanName}).eq('phone', phoneQuery);
       }
-
-      if (existing == null) {
-        final res = await _supabase
-            .from('customers')
-            .select()
-            .eq('phone', phoneQuery)
-            .maybeSingle();
-        if (res != null) existing = res;
-      }
-
-      if (existing != null) {
-        final updateMap = <String, dynamic>{};
-        if (name != null && name.isNotEmpty && (existing['name'] == null || existing['name'] == '')) {
-          updateMap['name'] = name;
-        }
-        if (email != null && email.isNotEmpty && (existing['email'] == null || existing['email'] == '')) {
-          updateMap['email'] = email;
-        }
-        if (resolvedAuthId != null && existing['auth_user_id'] == null) {
-          updateMap['auth_user_id'] = resolvedAuthId;
-        }
-
-        if (updateMap.isNotEmpty) {
-          final updated = await _supabase
-              .from('customers')
-              .update(updateMap)
-              .eq('id', existing['id'])
-              .select()
-              .single();
-          final cust = CustomerModel.fromJson(updated).copyWith(isVerified: true);
-          await _cacheCustomer(cust);
-          return cust;
-        }
-
-        final cust = CustomerModel.fromJson(existing).copyWith(isVerified: true);
-        await _cacheCustomer(cust);
-        return cust;
-      }
-
-      // 2. Insert new customer
-      final insertMap = <String, dynamic>{
-        'phone': phoneQuery,
-        'name': name ?? 'Customer',
-        'email': email,
-      };
-      if (resolvedAuthId != null) {
-        insertMap['auth_user_id'] = resolvedAuthId;
-      }
-
-      final created = await _supabase
-          .from('customers')
-          .insert(insertMap)
-          .select()
-          .single();
-
-      final cust = CustomerModel.fromJson(created).copyWith(isVerified: true);
-      await _cacheCustomer(cust);
-      return cust;
     } catch (e) {
-      debugPrint('[AuthService] upsertCustomer DB note: $e');
+      debugPrint('[AuthService] updateCustomerName note: $e');
+    }
 
-      // Valid UUID customer model with phone verified
-      final fallbackId = resolvedAuthId ?? const Uuid().v4();
-      final fallback = CustomerModel(
-        id: fallbackId,
-        phone: phoneQuery,
-        name: name ?? 'Customer',
-        email: email,
-        authUserId: resolvedAuthId,
-        dob: dob,
-        whatsappOptIn: whatsappOptIn,
-        isVerified: true,
-      );
-      await _cacheCustomer(fallback);
-      return fallback;
+    final cached = await getCachedCustomer();
+    if (cached != null) {
+      await _cacheCustomer(cached.copyWith(name: cleanName));
     }
   }
 
@@ -152,7 +183,14 @@ class AuthService {
     final str = prefs.getString(_prefKeyCachedCustomer);
     if (str != null) {
       try {
-        return CustomerModel.fromJson(jsonDecode(str));
+        var cust = CustomerModel.fromJson(jsonDecode(str));
+        final savedName = prefs.getString(_prefKeyCustomerName);
+        if ((cust.name == null || cust.name!.isEmpty || cust.name == 'Customer') &&
+            savedName != null &&
+            savedName.isNotEmpty) {
+          cust = cust.copyWith(name: savedName);
+        }
+        return cust;
       } catch (_) {}
     }
     return null;

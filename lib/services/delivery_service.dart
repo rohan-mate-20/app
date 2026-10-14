@@ -67,10 +67,12 @@ class DeliveryPricingService {
     required double subtotal,
     bool isPickup = false,
     int pastEligibleDeliveries = 0,
-    int freeDeliveryOrderCount = 3,
+    int freeDeliveryOrderCount = 0,
   }) {
     if (isPickup) return 0.0;
-    if (pastEligibleDeliveries < freeDeliveryOrderCount) return 0.0;
+    if (freeDeliveryOrderCount > 0 && pastEligibleDeliveries < freeDeliveryOrderCount) {
+      return 0.0;
+    }
     if (subtotal >= 1000.0) {
       return 30.0;
     }

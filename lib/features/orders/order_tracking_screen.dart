@@ -117,10 +117,13 @@ class OrderTrackingScreen extends StatelessWidget {
                         }
                       }
                     }
+                    final slotText = order.deliverySlotTime.isNotEmpty
+                        ? order.deliverySlotTime
+                        : '11:00 AM - 2:00 PM';
                     return Text(
                       order.isPickup
-                          ? 'Pickup Slot: $dateLabel, ${order.deliverySlotTime ?? '11:00 AM - 2:00 PM'}'
-                          : 'Expected delivery: $dateLabel, ${order.deliverySlotTime ?? '11:00 AM - 2:00 PM'}',
+                          ? 'Pickup Slot: $dateLabel, $slotText'
+                          : 'Expected delivery: $dateLabel, $slotText',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,

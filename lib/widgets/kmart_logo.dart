@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
 class KMartLogo extends StatelessWidget {
@@ -15,7 +15,7 @@ class KMartLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double logoHeight = fontSize * 1.15;
+    final double logoHeight = fontSize * 1.35;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

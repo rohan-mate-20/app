@@ -151,17 +151,24 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             catalogProvider.selectCategory('all');
                           },
                         )
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.68,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: products.length,
-                          itemBuilder: (context, index) {
-                            return ProductCard(product: products[index]);
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final cardWidth = (constraints.maxWidth - 32 - 12) / 2;
+                            final childAspectRatio = cardWidth / 324;
+
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: childAspectRatio,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: products.length,
+                              itemBuilder: (context, index) {
+                                return ProductCard(product: products[index]);
+                              },
+                            );
                           },
                         ),
             ),

@@ -217,19 +217,24 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.68,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                        itemCount: allProducts.length,
-                        itemBuilder: (context, index) {
-                          return ProductCard(product: allProducts[index]);
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cardWidth = (constraints.maxWidth - 12) / 2;
+                          final childAspectRatio = cardWidth / 324;
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: childAspectRatio,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: allProducts.length,
+                            itemBuilder: (context, index) {
+                              return ProductCard(product: allProducts[index]);
+                            },
+                          );
                         },
                       ),
                     ],
@@ -243,18 +248,23 @@ class _SearchScreenState extends State<SearchScreen> {
                         'We couldn\'t find any products matching "$queryText"',
                     icon: Icons.search_off_rounded,
                   )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.68,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: results.length,
-                    itemBuilder: (context, index) {
-                      return ProductCard(product: results[index]);
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = (constraints.maxWidth - 32 - 12) / 2;
+                      final childAspectRatio = cardWidth / 324;
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: childAspectRatio,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: results.length,
+                        itemBuilder: (context, index) {
+                          return ProductCard(product: results[index]);
+                        },
+                      );
                     },
                   ),
       ),

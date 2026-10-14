@@ -40,11 +40,11 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        toolbarHeight: 68,
+        toolbarHeight: 70,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const KMartLogo(fontSize: 18, showTagline: false),
+            const KMartLogo(fontSize: 26, showTagline: false),
             const SizedBox(height: 2),
             if (authProvider.isLoggedIn)
               InkWell(
@@ -570,22 +570,22 @@ class HomeScreen extends StatelessWidget {
               // Horizontal Products ListView
               if (catalogProvider.isLoading)
                 SizedBox(
-                  height: 245,
+                  height: 326,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
                     itemCount: 4,
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (_, __) => const SkeletonLoader(
-                      width: 150,
-                      height: 245,
+                      width: 165,
+                      height: 326,
                       borderRadius: 16,
                     ),
                   ),
                 )
               else
                 SizedBox(
-                  height: 245,
+                  height: 326,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
@@ -749,6 +749,8 @@ class HomeScreen extends StatelessWidget {
                         builder: (context, constraints) {
                           final width = constraints.maxWidth;
                           final int columns = width > 900 ? 4 : (width > 550 ? 3 : 2);
+                          final cardWidth = (width - ((columns - 1) * 12)) / columns;
+                          final childAspectRatio = cardWidth / 324;
                           final products = catalogProvider.filteredProducts;
 
                           return GridView.builder(
@@ -756,7 +758,7 @@ class HomeScreen extends StatelessWidget {
                             physics: const NeverScrollableScrollPhysics(),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
-                              childAspectRatio: width > 550 ? 0.72 : 0.68,
+                              childAspectRatio: childAspectRatio,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 14,
                             ),

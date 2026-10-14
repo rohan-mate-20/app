@@ -1,3 +1,4 @@
+import '../core/config/env_config.dart';
 import '../core/constants/app_constants.dart';
 
 class ProductModel {
@@ -150,38 +151,32 @@ class ProductModel {
       }
     }
 
-    int stock = 50;
+    final targetStoreId = storeId ?? EnvConfig.defaultStoreId;
+    int stock = 0;
     if (json['inventory'] != null) {
       if (json['inventory'] is List) {
         final invList = json['inventory'] as List;
-        if (storeId != null) {
-          final match = invList.firstWhere(
-            (inv) => inv is Map && inv['store_id'] == storeId,
-            orElse: () => null,
-          );
-          if (match != null && match is Map) {
-            final parsedStock = (match['stock_quantity'] as num?)?.toInt();
-            if (parsedStock != null && parsedStock > 0) {
-              stock = parsedStock;
-            }
-          }
-        } else {
-          final totalStock = invList.fold<int>(0, (sum, inv) {
+        final match = invList.firstWhere(
+          (inv) => inv is Map && inv['store_id'] == targetStoreId,
+          orElse: () => null,
+        );
+        if (match != null && match is Map) {
+          stock = (match['stock_quantity'] as num?)?.toInt() ?? 0;
+        } else if (invList.isNotEmpty) {
+          stock = invList.fold<int>(0, (sum, inv) {
             if (inv is Map) {
               return sum + ((inv['stock_quantity'] as num?)?.toInt() ?? 0);
             }
             return sum;
           });
-          if (totalStock > 0) {
-            stock = totalStock;
-          }
         }
       } else if (json['inventory'] is Map) {
-        final parsedStock = (json['inventory']['stock_quantity'] as num?)?.toInt();
-        if (parsedStock != null && parsedStock > 0) {
-          stock = parsedStock;
-        }
+        stock = (json['inventory']['stock_quantity'] as num?)?.toInt() ?? 0;
       }
+    } else if (json['stock_quantity'] != null) {
+      stock = (json['stock_quantity'] as num?)?.toInt() ?? 0;
+    } else {
+      stock = 50;
     }
 
     final rawName = (json['name'] ?? 'Grocery Product').toString();
@@ -193,32 +188,48 @@ class ProductModel {
     String inferredBrand = (json['brand'] ?? '').toString().trim();
     if (inferredBrand.isEmpty || inferredBrand == 'null') {
       final upper = prodName.toUpperCase();
-      if (upper.contains('AMUL')) inferredBrand = 'Amul';
-      else if (upper.contains('CADBURY')) inferredBrand = 'Cadbury';
-      else if (upper.contains('LOREAL') || upper.contains("L'OREAL")) inferredBrand = "L'Oreal";
-      else if (upper.contains('BRITANNIA')) inferredBrand = 'Britannia';
-      else if (upper.contains('PARLE')) inferredBrand = 'Parle';
-      else if (upper.contains('LIZOL')) inferredBrand = 'Lizol';
-      else if (upper.contains('LIFEBUOY')) inferredBrand = 'Lifebuoy';
-      else if (upper.contains('ACT II') || upper.contains('ACTII')) inferredBrand = 'Act II';
-      else if (upper.contains('LIJJAT')) inferredBrand = 'Lijjat';
-      else if (upper.contains('COLGATE')) inferredBrand = 'Colgate';
-      else if (upper.contains('SURF')) inferredBrand = 'Surf Excel';
-      else if (upper.contains('DETTOL')) inferredBrand = 'Dettol';
-      else if (upper.contains('SAFFOLA')) inferredBrand = 'Saffola';
-      else if (upper.contains('FORTUNE')) inferredBrand = 'Fortune';
-      else inferredBrand = 'K MART';
+      if (upper.contains('AMUL')) {
+        inferredBrand = 'Amul';
+      } else if (upper.contains('CADBURY')) {
+        inferredBrand = 'Cadbury';
+      } else if (upper.contains('LOREAL') || upper.contains("L'OREAL")) {
+        inferredBrand = "L'Oreal";
+      } else if (upper.contains('BRITANNIA')) {
+        inferredBrand = 'Britannia';
+      } else if (upper.contains('PARLE')) {
+        inferredBrand = 'Parle';
+      } else if (upper.contains('LIZOL')) {
+        inferredBrand = 'Lizol';
+      } else if (upper.contains('LIFEBUOY')) {
+        inferredBrand = 'Lifebuoy';
+      } else if (upper.contains('ACT II') || upper.contains('ACTII')) {
+        inferredBrand = 'Act II';
+      } else if (upper.contains('LIJJAT')) {
+        inferredBrand = 'Lijjat';
+      } else if (upper.contains('COLGATE')) {
+        inferredBrand = 'Colgate';
+      } else if (upper.contains('SURF')) {
+        inferredBrand = 'Surf Excel';
+      } else if (upper.contains('DETTOL')) {
+        inferredBrand = 'Dettol';
+      } else if (upper.contains('SAFFOLA')) {
+        inferredBrand = 'Saffola';
+      } else if (upper.contains('FORTUNE')) {
+        inferredBrand = 'Fortune';
+      } else {
+        inferredBrand = 'K MART';
+      }
     }
 
     return ProductModel(
-      id: json['id'] ?? '',
+      id: (json['id'] ?? json['product_id'] ?? '').toString().trim(),
       sku: json['sku'],
       barcode: json['barcode'],
       name: prodName.isNotEmpty ? prodName : rawName,
       brand: inferredBrand,
       categoryId: json['category_id'],
-      categoryName: catName,
-      categorySlug: categoryNameToSlug(catName),
+      categoryName: json['category_name']?.toString() ?? catName,
+      categorySlug: categoryNameToSlug(json['category_name']?.toString() ?? catName),
       description: json['description'] ??
           '$prodName — fresh daily essential available for guaranteed on-time doorstep delivery from K MART.',
       mrp: rawMrp > 0 ? rawMrp : rawPrice,
@@ -243,13 +254,20 @@ class ProductModel {
       'name': name,
       'brand': brand,
       'category_id': categoryId,
+      'category_name': categoryName,
+      'category_slug': categorySlug,
       'description': description,
       'mrp': mrp,
       'selling_price': sellingPrice,
+      'discount_percent': discountPercent,
       'tax_percent': taxPercent,
       'weight_unit': weightUnit,
       'image_url': imageUrl,
       'active': active,
+      'stock_quantity': stockQuantity,
+      'in_stock': inStock,
+      'rating': rating,
+      'review_count': reviewCount,
     };
   }
 }

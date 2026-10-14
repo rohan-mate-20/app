@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
 
@@ -6,12 +8,47 @@ import '../services/cart_service.dart';
 import '../services/delivery_service.dart';
 
 class CartProvider with ChangeNotifier {
+  static const String _localCartKey = 'kmart_local_cart_items_v1';
   final CartService _cartService = CartService();
 
   List<CartItemModel> _items = [];
   String? _dbCartId;
   bool _isLoading = false;
   int _completedDeliveriesCount = 0;
+
+  CartProvider() {
+    _loadLocalCart();
+  }
+
+  Future<void> _loadLocalCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedJson = prefs.getString(_localCartKey);
+      if (savedJson != null && savedJson.trim().isNotEmpty) {
+        final List decoded = jsonDecode(savedJson);
+        final loaded = decoded
+            .map((item) => CartItemModel.fromJson(Map<String, dynamic>.from(item)))
+            .where((item) => item.product.id.trim().isNotEmpty)
+            .toList();
+        if (loaded.isNotEmpty && _items.isEmpty) {
+          _items = loaded;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[CartProvider] _loadLocalCart error: $e');
+    }
+  }
+
+  Future<void> _saveLocalCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = _items.map((it) => it.toJson()).toList();
+      await prefs.setString(_localCartKey, jsonEncode(list));
+    } catch (e) {
+      debugPrint('[CartProvider] _saveLocalCart error: $e');
+    }
+  }
 
   List<CartItemModel> get items => _items;
   int get itemCount => _items.fold(0, (sum, it) => sum + it.quantity);
@@ -72,7 +109,9 @@ class CartProvider with ChangeNotifier {
   }
 
   int getQuantity(String productId) {
-    final index = _items.indexWhere((i) => i.product.id == productId);
+    final cleanId = productId.trim();
+    if (cleanId.isEmpty) return 0;
+    final index = _items.indexWhere((i) => i.product.id.trim() == cleanId);
     return index >= 0 ? _items[index].quantity : 0;
   }
 
@@ -86,8 +125,21 @@ class CartProvider with ChangeNotifier {
       if (_dbCartId != null) {
         final dbItems = await _cartService.loadCartItems(_dbCartId!);
         if (dbItems.isNotEmpty) {
-          _items = dbItems;
+          // Merge db items into local cart if not already present
+          for (final dbItem in dbItems) {
+            final idx = _items.indexWhere(
+              (it) => it.product.id.trim() == dbItem.product.id.trim(),
+            );
+            if (idx < 0) {
+              _items.add(dbItem);
+            }
+          }
         }
+        // Sync any items currently in local cart to DB
+        for (final item in _items) {
+          _syncDb(item.product.id, item.quantity);
+        }
+        await _saveLocalCart();
       }
     } catch (e) {
       debugPrint('[CartProvider] initForCustomer error: $e');
@@ -98,46 +150,57 @@ class CartProvider with ChangeNotifier {
   }
 
   void addToCart(ProductModel product, {int quantity = 1}) {
-    final index = _items.indexWhere((i) => i.product.id == product.id);
+    final cleanId = product.id.trim();
+    final index = _items.indexWhere((i) => i.product.id.trim() == cleanId);
     if (index >= 0) {
       _items[index].quantity += quantity;
     } else {
       _items.add(CartItemModel(product: product, quantity: quantity));
     }
-    _syncDb(product.id, getQuantity(product.id));
+    _syncDb(cleanId, getQuantity(cleanId));
+    _saveLocalCart();
     notifyListeners();
   }
 
   void updateQuantity(String productId, int newQuantity) {
-    final index = _items.indexWhere((i) => i.product.id == productId);
+    final cleanId = productId.trim();
+    final index = _items.indexWhere((i) => i.product.id.trim() == cleanId);
     if (index >= 0) {
       if (newQuantity <= 0) {
         _items.removeAt(index);
       } else {
         _items[index].quantity = newQuantity;
       }
-      _syncDb(productId, newQuantity);
+      _syncDb(cleanId, newQuantity);
+      _saveLocalCart();
       notifyListeners();
     }
   }
 
   void removeFromCart(String productId) {
-    _items.removeWhere((i) => i.product.id == productId);
-    _syncDb(productId, 0);
+    final cleanId = productId.trim();
+    _items.removeWhere((i) => i.product.id.trim() == cleanId);
+    _syncDb(cleanId, 0);
+    _saveLocalCart();
     notifyListeners();
   }
 
   void clearCart() {
     _items.clear();
+    _saveLocalCart();
     if (_dbCartId != null) {
       _cartService.clearCart(_dbCartId!);
     }
     notifyListeners();
   }
 
-  void _syncDb(String productId, int qty) {
-    if (_dbCartId != null) {
-      _cartService.syncCartItem(_dbCartId!, productId, qty);
+  void _syncDb(String productId, int qty) async {
+    if (_dbCartId != null && productId.trim().isNotEmpty) {
+      try {
+        await _cartService.syncCartItem(_dbCartId!, productId.trim(), qty);
+      } catch (e) {
+        debugPrint('[CartProvider] _syncDb error: $e');
+      }
     }
   }
 }

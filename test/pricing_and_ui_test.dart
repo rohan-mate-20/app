@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kmart_customer/services/delivery_service.dart';
+import 'package:kmart_customer/models/cart_item_model.dart';
 import 'package:kmart_customer/models/delivery_settings_model.dart';
 import 'package:kmart_customer/models/delivery_slot_model.dart';
 import 'package:kmart_customer/models/order_model.dart';
+import 'package:kmart_customer/models/product_model.dart';
+import 'package:kmart_customer/providers/cart_provider.dart';
+import 'package:kmart_customer/services/delivery_service.dart';
 import 'package:kmart_customer/widgets/need_help_faq_sheet.dart';
 
 void main() {
@@ -71,26 +74,35 @@ void main() {
       expect(fee, 30.0);
     });
 
-    test('8. First 3 eligible deliveries receive ₹0 delivery fee', () {
+    test('8. First 3 eligible deliveries receive ₹0 delivery fee when promotion is active', () {
       expect(
-        DeliveryPricingService.calculateDeliveryFee(subtotal: 350, pastEligibleDeliveries: 0),
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 350, pastEligibleDeliveries: 0, freeDeliveryOrderCount: 3),
         0.0,
       );
       expect(
-        DeliveryPricingService.calculateDeliveryFee(subtotal: 600, pastEligibleDeliveries: 1),
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 600, pastEligibleDeliveries: 1, freeDeliveryOrderCount: 3),
         0.0,
       );
       expect(
-        DeliveryPricingService.calculateDeliveryFee(subtotal: 1200, pastEligibleDeliveries: 2),
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 1200, pastEligibleDeliveries: 2, freeDeliveryOrderCount: 3),
         0.0,
       );
       // 4th delivery onwards is not free
       expect(
-        DeliveryPricingService.calculateDeliveryFee(subtotal: 600, pastEligibleDeliveries: 3),
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 600, pastEligibleDeliveries: 3, freeDeliveryOrderCount: 3),
         40.0,
       );
       expect(
-        DeliveryPricingService.calculateDeliveryFee(subtotal: 1200, pastEligibleDeliveries: 3),
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 1200, pastEligibleDeliveries: 3, freeDeliveryOrderCount: 3),
+        30.0,
+      );
+      // Standard deliveries without promotional free count default to fixed fee
+      expect(
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 600),
+        40.0,
+      );
+      expect(
+        DeliveryPricingService.calculateDeliveryFee(subtotal: 1200),
         30.0,
       );
     });
@@ -167,8 +179,8 @@ void main() {
   });
 
   group('Need Help FAQ Content Tests', () {
-    test('14. Exactly 8 predefined FAQ questions and answers are present', () {
-      expect(NeedHelpFaqSheet.faqs.length, 8);
+    test('14. Exactly 7 predefined FAQ questions and answers are present (cancel order removed)', () {
+      expect(NeedHelpFaqSheet.faqs.length, 7);
       for (final faq in NeedHelpFaqSheet.faqs) {
         expect(faq['question']?.isNotEmpty, true);
         expect(faq['answer']?.isNotEmpty, true);
@@ -177,10 +189,10 @@ void main() {
       expect(NeedHelpFaqSheet.faqs[1]['question'], 'How can I track my order?');
       expect(NeedHelpFaqSheet.faqs[2]['question'], 'What are the delivery charges?');
       expect(NeedHelpFaqSheet.faqs[3]['question'], 'Can I collect my order myself?');
-      expect(NeedHelpFaqSheet.faqs[4]['question'], 'How can I cancel my order?');
-      expect(NeedHelpFaqSheet.faqs[5]['question'], 'What payment methods are available?');
-      expect(NeedHelpFaqSheet.faqs[6]['question'], 'What are handling and platform fees?');
-      expect(NeedHelpFaqSheet.faqs[7]['question'], 'How can I contact customer support?');
+      expect(NeedHelpFaqSheet.faqs[4]['question'], 'What payment methods are available?');
+      expect(NeedHelpFaqSheet.faqs[5]['question'], 'What are handling and platform fees?');
+      expect(NeedHelpFaqSheet.faqs[6]['question'], 'How can I contact customer support?');
+      expect(NeedHelpFaqSheet.faqs[6]['answer'], 'Contact our customer support directly at +91 99750 40003.');
     });
   });
 
@@ -320,6 +332,66 @@ void main() {
       expect(userAOrders.length, 1);
       expect(userAOrders.first.orderNumber, 'KM1001');
       expect(loggedOutOrders.isEmpty, true);
+    });
+
+    test('22. CartItemModel full serialization and deserialization roundtrip', () {
+      final item = CartItemModel(
+        product: ProductModel(
+          id: 'prod-uuid-123',
+          name: 'Santoor Soap 125g',
+          brand: 'Santoor',
+          categoryName: 'Personal Care',
+          categorySlug: 'personal-care',
+          mrp: 60.0,
+          sellingPrice: 48.0,
+          discountPercent: 20,
+          weightUnit: '125g',
+          imageUrl: 'https://example.com/soap.png',
+          inStock: true,
+        ),
+        quantity: 3,
+      );
+
+      final json = item.toJson();
+      expect(json['product_id'], 'prod-uuid-123');
+      expect(json['quantity'], 3);
+
+      final restored = CartItemModel.fromJson(json);
+      expect(restored.product.id, 'prod-uuid-123');
+      expect(restored.product.name, 'Santoor Soap 125g');
+      expect(restored.product.sellingPrice, 48.0);
+      expect(restored.product.mrp, 60.0);
+      expect(restored.quantity, 3);
+      expect(restored.lineTotal, 144.0);
+    });
+
+    test('23. CartProvider preserves items and matches trimmed product ids correctly', () {
+      final cart = CartProvider();
+      final product = ProductModel(
+        id: '  prod-999  ',
+        name: 'Amul Milk 500ml',
+        categoryName: 'Dairy & Eggs',
+        categorySlug: 'dairy-and-eggs',
+        mrp: 30.0,
+        sellingPrice: 27.0,
+        discountPercent: 10,
+        weightUnit: '500ml',
+        imageUrl: 'https://example.com/milk.png',
+        inStock: true,
+      );
+
+      cart.addToCart(product, quantity: 2);
+      expect(cart.getQuantity('prod-999'), 2);
+      expect(cart.getQuantity('  prod-999  '), 2);
+      expect(cart.itemCount, 2);
+
+      cart.updateQuantity('prod-999', 4);
+      expect(cart.getQuantity('prod-999'), 4);
+      expect(cart.itemCount, 4);
+
+      cart.removeFromCart('prod-999');
+      expect(cart.getQuantity('prod-999'), 0);
+      expect(cart.isEmpty, true);
     });
   });
 }

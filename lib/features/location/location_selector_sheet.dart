@@ -15,6 +15,7 @@ class LocationSelectorSheet extends StatefulWidget {
 }
 
 class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
+  late final TextEditingController _nameController;
   final TextEditingController _houseController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
   final TextEditingController _landmarkController = TextEditingController();
@@ -25,7 +26,18 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
   bool _isDefault = true;
 
   @override
+  void initState() {
+    super.initState();
+    final authCust = context.read<AuthProvider>().currentCustomer;
+    final initialName = (authCust?.name != null && authCust!.name!.isNotEmpty && authCust.name != 'Customer')
+        ? authCust.name!
+        : '';
+    _nameController = TextEditingController(text: initialName);
+  }
+
+  @override
   void dispose() {
+    _nameController.dispose();
     _houseController.dispose();
     _areaController.dispose();
     _landmarkController.dispose();
@@ -39,6 +51,7 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
     final house = _houseController.text.trim();
     final area = _areaController.text.trim();
     final pin = _pincodeController.text.trim();
+    final enteredName = _nameController.text.trim();
 
     if (house.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -53,19 +66,29 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
     final authCust = context.read<AuthProvider>().currentCustomer;
     final storeProvider = context.read<StoreDeliveryProvider>();
 
+    if (enteredName.isNotEmpty && enteredName != 'Customer') {
+      context.read<AuthProvider>().updateCustomerName(enteredName);
+    }
+
+    final resolvedName = enteredName.isNotEmpty
+        ? enteredName
+        : ((authCust?.name != null && authCust!.name!.isNotEmpty && authCust.name != 'Customer')
+            ? authCust.name!
+            : 'Customer');
+
     final newAddress = AddressModel(
       id: 'addr_${DateTime.now().millisecondsSinceEpoch}',
       customerId: authCust?.id ?? '',
       label: _selectedLabel,
-      fullName: authCust?.name ?? 'Customer',
+      fullName: resolvedName,
       phone: authCust?.phone ?? '9876543210',
       line1: house,
       line2: area.isNotEmpty ? area : _landmarkController.text.trim(),
       city: _cityController.text.trim(),
       state: _stateController.text.trim(),
       pincode: pin,
-      latitude: 18.5204,
-      longitude: 73.8567,
+      latitude: 18.1508,
+      longitude: 74.5779,
       isDefault: _isDefault,
     );
 
@@ -337,6 +360,15 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                   const SizedBox(height: 14),
 
                   // Form Fields
+                  TextField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      hintText: 'Customer / Receiver Full Name',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   TextField(
                     controller: _houseController,
                     decoration: const InputDecoration(

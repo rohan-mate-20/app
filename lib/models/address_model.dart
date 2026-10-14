@@ -1,4 +1,4 @@
-﻿class AddressModel {
+class AddressModel {
   final String id;
   final String customerId;
   final String label; // "Home", "Work", "Other"
@@ -21,11 +21,11 @@
     required this.phone,
     required this.line1,
     this.line2,
-    this.city = 'Pune',
+    this.city = 'Baramati',
     this.state = 'Maharashtra',
     required this.pincode,
-    this.latitude = 18.5204,
-    this.longitude = 73.8567,
+    this.latitude = 18.1508,
+    this.longitude = 74.5779,
     this.isDefault = false,
   });
 
@@ -47,11 +47,11 @@
       phone: json['phone'] ?? '',
       line1: json['line1'] ?? '',
       line2: json['line2'],
-      city: json['city'] ?? 'Pune',
+      city: json['city'] ?? 'Baramati',
       state: json['state'] ?? 'Maharashtra',
-      pincode: json['pincode'] ?? '411001',
-      latitude: (json['latitude'] as num?)?.toDouble() ?? 18.5204,
-      longitude: (json['longitude'] as num?)?.toDouble() ?? 73.8567,
+      pincode: json['pincode'] ?? '413102',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 18.1508,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 74.5779,
       isDefault: json['is_default'] ?? false,
     );
   }

@@ -17,22 +17,29 @@ class CheckoutService {
     String? scheduledDate, // 'YYYY-MM-DD'
     required String paymentMethod, // 'COD' or 'ONLINE'
     String? idempotencyKey,
+    List<dynamic>? items,
   }) async {
     try {
       final key = idempotencyKey ?? const Uuid().v4();
 
+      final body = <String, dynamic>{
+        'customerId': customerId,
+        'addressId': orderType == 'DELIVERY' ? addressId : null,
+        'orderType': orderType,
+        'pickupStoreId': orderType == 'PICKUP' ? pickupStoreId : null,
+        'deliverySlotId': orderType == 'DELIVERY' ? deliverySlotId : null,
+        'scheduledDeliveryDate': orderType == 'DELIVERY' ? scheduledDate : null,
+        'paymentMethod': paymentMethod, // 'COD' or 'ONLINE'
+        'idempotencyKey': key,
+      };
+
+      if (items != null && items.isNotEmpty) {
+        body['items'] = items;
+      }
+
       final response = await _supabase.functions.invoke(
         'checkout',
-        body: {
-          'customerId': customerId,
-          'addressId': orderType == 'DELIVERY' ? addressId : null,
-          'orderType': orderType,
-          'pickupStoreId': orderType == 'PICKUP' ? pickupStoreId : null,
-          'deliverySlotId': orderType == 'DELIVERY' ? deliverySlotId : null,
-          'scheduledDeliveryDate': orderType == 'DELIVERY' ? scheduledDate : null,
-          'paymentMethod': paymentMethod, // 'COD' or 'ONLINE'
-          'idempotencyKey': key,
-        },
+        body: body,
       );
 
       if (response.status != 200) {
