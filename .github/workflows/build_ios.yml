@@ -103,12 +103,6 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Install macOS CocoaPods
-        run: |
-          cd macos
-          pod install
-          cd ..
-
       - name: Build macOS Desktop App (Release)
         run: |
           flutter build macos --release
