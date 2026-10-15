@@ -54,7 +54,16 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final ordersProvider = context.read<OrdersProvider>();
-        context.read<CartProvider>().setCompletedDeliveriesCount(ordersProvider.completedDeliveriesCount);
+        final authCust = context.read<AuthProvider>().currentCustomer;
+        if (authCust != null && ordersProvider.orders.isEmpty) {
+          ordersProvider.loadOrders(authCust.id).then((_) {
+            if (mounted) {
+              context.read<CartProvider>().setCompletedDeliveriesCount(ordersProvider.completedDeliveriesCount);
+            }
+          });
+        } else {
+          context.read<CartProvider>().setCompletedDeliveriesCount(ordersProvider.completedDeliveriesCount);
+        }
 
         final storeProv = context.read<StoreDeliveryProvider>();
         if (storeProv.deliverySlots.isNotEmpty) {

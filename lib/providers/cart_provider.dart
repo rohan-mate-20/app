@@ -83,21 +83,31 @@ class CartProvider with ChangeNotifier {
   double get totalSavings => (mrpTotal - itemTotal) > 0 ? (mrpTotal - itemTotal) : 0.0;
 
   /// Calculate Delivery Fee using centralized DeliveryPricingService
-  double calculateDeliveryFee({bool isPickup = false, int? pastDeliveries}) {
+  double calculateDeliveryFee({
+    bool isPickup = false,
+    int? pastDeliveries,
+    int freeDeliveryOrderCount = 3,
+  }) {
     if (isEmpty) return 0.0;
     return DeliveryPricingService.calculateDeliveryFee(
       subtotal: itemTotal,
       isPickup: isPickup,
       pastEligibleDeliveries: pastDeliveries ?? _completedDeliveriesCount,
+      freeDeliveryOrderCount: freeDeliveryOrderCount,
     );
   }
 
   /// Grand total: Subtotal + Delivery + Handling + Platform (Coupons removed)
-  double calculateGrandTotal({bool isPickup = false, int? pastDeliveries}) {
+  double calculateGrandTotal({
+    bool isPickup = false,
+    int? pastDeliveries,
+    int freeDeliveryOrderCount = 3,
+  }) {
     if (isEmpty) return 0.0;
     final delFee = calculateDeliveryFee(
       isPickup: isPickup,
       pastDeliveries: pastDeliveries,
+      freeDeliveryOrderCount: freeDeliveryOrderCount,
     );
     return DeliveryPricingService.calculatePayableTotal(
       subtotal: itemTotal,
