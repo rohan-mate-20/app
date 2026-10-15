@@ -204,6 +204,19 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearCartOnLogout() async {
+    _items.clear();
+    _dbCartId = null;
+    _completedDeliveriesCount = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_localCartKey);
+    } catch (e) {
+      debugPrint('[CartProvider] clearCartOnLogout error: $e');
+    }
+    notifyListeners();
+  }
+
   void _syncDb(String productId, int qty) async {
     if (_dbCartId != null && productId.trim().isNotEmpty) {
       try {

@@ -85,6 +85,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         context.read<OrdersProvider>().clearOrders();
+        context.read<CartProvider>().clearCartOnLogout();
       });
     }
   }
