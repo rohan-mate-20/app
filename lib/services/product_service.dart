@@ -34,6 +34,7 @@ class ProductService {
       final list = response as List;
       return list
           .map((item) => ProductModel.fromJson(item, storeId: storeId))
+          .where((product) => product.stockQuantity >= 5)
           .toList();
     } catch (e) {
       debugPrint('[ProductService] fetchProducts error: $e');
@@ -80,6 +81,7 @@ class ProductService {
       final list = response as List;
       return list
           .map((item) => ProductModel.fromJson(item, storeId: storeId))
+          .where((product) => product.stockQuantity >= 5)
           .toList();
     } catch (e) {
       debugPrint('[ProductService] searchProducts or query error, attempting name fallback: $e');
@@ -99,6 +101,7 @@ class ProductService {
         final list = fallback as List;
         return list
             .map((item) => ProductModel.fromJson(item, storeId: storeId))
+            .where((product) => product.stockQuantity >= 5)
             .toList();
       } catch (e2) {
         debugPrint('[ProductService] searchProducts fallback error: $e2');

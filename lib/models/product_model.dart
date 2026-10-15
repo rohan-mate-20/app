@@ -176,7 +176,7 @@ class ProductModel {
     } else if (json['stock_quantity'] != null) {
       stock = (json['stock_quantity'] as num?)?.toInt() ?? 0;
     } else {
-      stock = 50;
+      stock = 0;
     }
 
     final rawName = (json['name'] ?? 'Grocery Product').toString();
@@ -239,8 +239,8 @@ class ProductModel {
       weightUnit: json['weight_unit'] ?? '1 unit',
       imageUrl: img,
       active: json['active'] ?? true,
-      stockQuantity: stock > 0 ? stock : 50,
-      inStock: true,
+      stockQuantity: stock,
+      inStock: stock >= 5,
       rating: 4.7,
       reviewCount: 124,
     );

@@ -238,12 +238,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 30),
-
-            const Text(
-              'K MART v1.0.0 (Production Build)\nDaily Essentials, Delivered',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
           ],
         ),
       ),

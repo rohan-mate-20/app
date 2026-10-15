@@ -166,6 +166,9 @@ class CatalogProvider with ChangeNotifier {
         ? List.from(_searchResults) 
         : List.from(_allProducts);
 
+    // Filter out products with less than 5 stock
+    list = list.where((p) => p.stockQuantity >= 5).toList();
+
     // 1. Filter by category
     if (_selectedCategorySlug != 'all') {
       final categoryMatches = list.where((p) => p.categorySlug == _selectedCategorySlug).toList();
@@ -195,14 +198,15 @@ class CatalogProvider with ChangeNotifier {
 
   List<ProductModel> get popularProducts {
     if (_allProducts.isEmpty) return [];
-    final priority = _allProducts.where((p) => p.discountPercent > 0 || (p.brand != null && p.brand != 'K MART')).toList();
+    final inStockList = _allProducts.where((p) => p.stockQuantity >= 5).toList();
+    final priority = inStockList.where((p) => p.discountPercent > 0 || (p.brand != null && p.brand != 'K MART')).toList();
     if (priority.isNotEmpty) {
       return priority.take(16).toList();
     }
-    return _allProducts.take(16).toList();
+    return inStockList.take(16).toList();
   }
 
   List<ProductModel> get discountedProducts {
-    return _allProducts.where((p) => p.discountPercent > 0).toList();
+    return _allProducts.where((p) => p.stockQuantity >= 5 && p.discountPercent > 0).toList();
   }
 }
