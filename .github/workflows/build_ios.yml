@@ -1,16 +1,16 @@
-name: Build & Release iOS IPA
+name: Build & Release iOS & macOS Apps
 
 on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: 'Create a GitHub Release with this IPA?'
+        description: 'Create a GitHub Release with these apps?'
         type: boolean
         default: true
       version_tag:
-        description: 'Release Tag (e.g., v1.0.0-ios)'
+        description: 'Release Tag (e.g., v1.0.0-apple)'
         type: string
-        default: 'v1.0.0-ios'
+        default: 'v1.0.0-apple'
   push:
     branches:
       - main
@@ -19,6 +19,7 @@ on:
     paths:
       - 'lib/**'
       - 'ios/**'
+      - 'macos/**'
       - 'assets/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
@@ -32,7 +33,7 @@ env:
 
 jobs:
   build-ipa:
-    name: Build iOS IPA
+    name: Build iOS IPA (iPhone)
     runs-on: macos-14
 
     steps:
@@ -80,18 +81,59 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: kmart-customer.ipa
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-ios' }}
-          name: "iOS Release ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-ios' }}"
-          body: |
-            ## K-MART iOS Application Release (.ipa)
-            
-            - **App Name:** K-MART Customer
-            - **Platform:** iOS (.ipa)
-            - **Packaging:** Sideloadable via Sideloadly, AltStore, or Apple Configurator.
-            
-            ### How to install on your iPhone:
-            1. Download `kmart-customer.ipa` on your computer.
-            2. Connect your iPhone via USB.
-            3. Open **Sideloadly** or **AltStore**, select `kmart-customer.ipa`, and install with your Apple ID.
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-apple' }}
+          name: "Apple Release ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-apple' }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: Build macOS Desktop App (MacBook)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Install macOS CocoaPods
+        run: |
+          cd macos
+          pod install
+          cd ..
+
+      - name: Build macOS Desktop App (Release)
+        run: |
+          flutter build macos --release
+
+      - name: Package macOS App into Zip
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r -y ../../../../../kmart-macos-desktop.zip "K MART.app"
+          cd ../../../../..
+          ls -lh kmart-macos-desktop.zip
+
+      - name: Upload macOS App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kmart-macos-desktop-app
+          path: kmart-macos-desktop.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: kmart-macos-desktop.zip
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-apple' }}
+          name: "Apple Release ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version_tag || 'v1.0.0-apple' }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
