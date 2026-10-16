@@ -205,15 +205,10 @@ class CartProvider with ChangeNotifier {
   }
 
   Future<void> clearCartOnLogout() async {
-    _items.clear();
     _dbCartId = null;
     _completedDeliveriesCount = 0;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_localCartKey);
-    } catch (e) {
-      debugPrint('[CartProvider] clearCartOnLogout error: $e');
-    }
+    // Retain default and guest cart items in local storage and in memory
+    await _saveLocalCart();
     notifyListeners();
   }
 

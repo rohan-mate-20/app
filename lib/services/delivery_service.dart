@@ -39,9 +39,10 @@ class DeliveryService {
 
       final list = response as List;
       if (list.isNotEmpty) {
-        return list
+        final rawSlots = list
             .map((item) => DeliverySlotModel.fromJson(Map<String, dynamic>.from(item)))
             .toList();
+        return DeliverySlotModel.filterAndSanitizeSlots(rawSlots);
       }
     } catch (e) {
       debugPrint('[DeliveryService] fetchDeliverySlots DB error: $e');

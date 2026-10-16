@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../models/notification_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../orders/orders_screen.dart';
 
@@ -28,7 +30,8 @@ class NotificationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notifProvider = context.watch<NotificationProvider>();
-    final notifications = notifProvider.notifications;
+    final authProvider = context.watch<AuthProvider>();
+    final notifications = authProvider.isLoggedIn ? notifProvider.notifications : <NotificationModel>[];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -39,7 +42,7 @@ class NotificationsScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          if (notifications.isNotEmpty)
+          if (authProvider.isLoggedIn && notifications.isNotEmpty)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded),
               onSelected: (value) {
@@ -75,9 +78,11 @@ class NotificationsScreen extends StatelessWidget {
         ],
       ),
       body: notifications.isEmpty
-          ? const EmptyStateView(
-              title: 'No notifications yet',
-              message: 'Your order updates, delivery tracking and alerts will appear here.',
+          ? EmptyStateView(
+              title: authProvider.isLoggedIn ? 'No notifications yet' : 'No notifications',
+              message: authProvider.isLoggedIn
+                  ? 'Your order updates, delivery tracking and alerts will appear here.'
+                  : 'Please log in to view your notifications, orders and delivery alerts.',
               icon: Icons.notifications_none_rounded,
             )
           : ListView.separated(

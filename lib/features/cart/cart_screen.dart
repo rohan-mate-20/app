@@ -12,6 +12,7 @@ import '../checkout/checkout_flow_screen.dart';
 import '../location/location_selector_sheet.dart';
 import '../navigation/main_navigation_shell.dart';
 import '../../providers/orders_provider.dart';
+import '../../providers/store_delivery_provider.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -391,49 +392,74 @@ class _CartScreenState extends State<CartScreen> {
               ),
 
             // Delivery Location Banner
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.navyLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.location_on_outlined,
-                    color: AppColors.navyDark,
-                    size: 20,
+            Consumer<StoreDeliveryProvider>(
+              builder: (context, storeProvider, _) {
+                final addr = storeProvider.selectedAddress;
+                final addressText = addr != null
+                    ? '${addr.line1}, ${addr.city}'
+                    : 'Baramati, Maharashtra';
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.navyLight,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Delivery Location\n2.4 km from K MART store',
-                      style: TextStyle(
-                        fontSize: 12,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
                         color: AppColors.navyDark,
-                        fontWeight: FontWeight.w600,
+                        size: 20,
                       ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => const LocationSelectorSheet(),
-                      );
-                    },
-                    child: const Text(
-                      'Change',
-                      style: TextStyle(
-                        color: AppColors.primaryRed,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Delivery Location',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              addressText,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: AppColors.navyDark,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => const LocationSelectorSheet(),
+                          );
+                        },
+                        child: const Text(
+                          'Change',
+                          style: TextStyle(
+                            color: AppColors.primaryRed,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 100),
           ],

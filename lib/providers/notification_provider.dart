@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notification_model.dart';
 
 class NotificationProvider with ChangeNotifier {
-  static const String _storageKey = 'kmart_notifications_v1';
+  static const String _defaultStorageKey = 'kmart_notifications_v1';
+  String? _currentCustomerId;
   List<NotificationModel> _notifications = [];
   bool _isLoaded = false;
 
@@ -13,22 +14,58 @@ class NotificationProvider with ChangeNotifier {
   bool get hasUnread => unreadCount > 0;
   bool get isLoaded => _isLoaded;
 
+  String _getStorageKey() {
+    if (_currentCustomerId != null && _currentCustomerId!.isNotEmpty) {
+      return 'kmart_notifications_cust_$_currentCustomerId';
+    }
+    return _defaultStorageKey;
+  }
+
   NotificationProvider() {
     _loadFromStorage();
+  }
+
+  Future<void> loadForCustomer(String? customerId) async {
+    _currentCustomerId = customerId;
+    _notifications = [];
+    _isLoaded = false;
+    notifyListeners();
+    await _loadFromStorage();
+  }
+
+  /// Clears notifications from in-memory state and UI immediately after logout
+  void clearOnLogout() {
+    _notifications = [];
+    _currentCustomerId = null;
+    _isLoaded = true;
+    notifyListeners();
   }
 
   Future<void> _loadFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
+      if (_currentCustomerId == null) {
+        final cachedUser = prefs.getString('kmart_cached_customer');
+        if (cachedUser != null && cachedUser.isNotEmpty) {
+          final decodedCust = json.decode(cachedUser);
+          if (decodedCust['id'] != null) {
+            _currentCustomerId = decodedCust['id'].toString();
+          }
+        }
+      }
+      final key = _getStorageKey();
+      final raw = prefs.getString(key);
       if (raw != null && raw.isNotEmpty) {
         final List<dynamic> decoded = json.decode(raw);
         _notifications = decoded
             .map((item) => NotificationModel.fromMap(Map<String, dynamic>.from(item)))
             .toList();
+      } else {
+        _notifications = [];
       }
     } catch (e) {
       debugPrint('[NotificationProvider] Error loading notifications: $e');
+      _notifications = [];
     }
     _isLoaded = true;
     notifyListeners();
@@ -37,8 +74,9 @@ class NotificationProvider with ChangeNotifier {
   Future<void> _saveToStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final key = _getStorageKey();
       final raw = json.encode(_notifications.map((n) => n.toMap()).toList());
-      await prefs.setString(_storageKey, raw);
+      await prefs.setString(key, raw);
     } catch (e) {
       debugPrint('[NotificationProvider] Error saving notifications: $e');
     }

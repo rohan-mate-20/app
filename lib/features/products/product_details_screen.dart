@@ -408,9 +408,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                       const SizedBox(width: 12),
                       const Text(
-                        'In stock\n(120 available)',
+                        'In stock',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppColors.successGreen,
                           fontWeight: FontWeight.w600,
                         ),

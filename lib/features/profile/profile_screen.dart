@@ -8,6 +8,8 @@ import '../auth/login_screen.dart';
 import '../legal/terms_and_privacy_screen.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/store_delivery_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -25,18 +27,18 @@ class ProfileScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // User Header Card
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: isLoggedIn
-                  ? Row(
+        child: isLoggedIn
+            ? Column(
+                children: [
+                  // User Header Card
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Row(
                       children: [
                         CircleAvatar(
                           radius: 30,
@@ -77,60 +79,161 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                       ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Profile Quick Action Menu
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Column(
                       children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 26,
-                              backgroundColor: AppColors.navyDark.withValues(alpha: 0.08),
-                              child: const Icon(
-                                Icons.person_outline_rounded,
-                                size: 28,
-                                color: AppColors.navyDark,
+                        _buildMenuItem(
+                          icon: Icons.location_on_outlined,
+                          title: 'Delivery Addresses',
+                          subtitle: 'Manage saved addresses & locations',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AddressManagementScreen(),
                               ),
-                            ),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Welcome to K MART',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.navyDark,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Log in to view addresses & orders',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
+                            );
+                          },
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildMenuItem(
+                          icon: Icons.headset_mic_outlined,
+                          title: 'Help & Customer Support',
+                          subtitle: 'FAQs, toll-free support & complaints',
+                          onTap: () => NeedHelpFaqSheet.show(context),
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildMenuItem(
+                          icon: Icons.policy_outlined,
+                          title: 'Terms & Privacy Policy',
+                          subtitle: 'Terms of service, refund & privacy',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const TermsAndPrivacyScreen(),
                               ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Logout Option
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: _buildMenuItem(
+                      icon: Icons.logout_rounded,
+                      title: 'Log Out',
+                      subtitle: 'Sign out from this device',
+                      iconColor: AppColors.primaryRed,
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Log Out?'),
+                            content: const Text(
+                              'Are you sure you want to sign out from K MART?',
                             ),
-                          ],
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  authProvider.signOut();
+                                  context.read<OrdersProvider>().clearOrders();
+                                  context.read<StoreDeliveryProvider>().clearAddresses();
+                                  context.read<CartProvider>().clearCartOnLogout();
+                                  context.read<NotificationProvider>().clearOnLogout();
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryRed,
+                                ),
+                                child: const Text('Log Out'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              )
+            : Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 36,
+                          backgroundColor: AppColors.navyDark.withValues(alpha: 0.08),
+                          child: const Icon(
+                            Icons.person_outline_rounded,
+                            size: 38,
+                            color: AppColors.navyDark,
+                          ),
                         ),
                         const SizedBox(height: 16),
+                        const Text(
+                          'Welcome to K MART',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyDark,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Log in with your mobile number to view your profile, manage addresses, and track your orders.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             icon: const Icon(Icons.login_rounded, size: 18),
                             label: const Text(
                               'Sign In with Mobile',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryRed,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -146,102 +249,9 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-            ),
-            const SizedBox(height: 20),
-
-            // Profile Quick Action Menu
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: Column(
-                children: [
-                  _buildMenuItem(
-                    icon: Icons.location_on_outlined,
-                    title: 'Delivery Addresses',
-                    subtitle: 'Manage saved addresses & locations',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AddressManagementScreen(),
-                        ),
-                      );
-                    },
                   ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
-                    icon: Icons.headset_mic_outlined,
-                    title: 'Help & Customer Support',
-                    subtitle: 'FAQs, toll-free support & complaints',
-                    onTap: () => NeedHelpFaqSheet.show(context),
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
-                    icon: Icons.policy_outlined,
-                    title: 'Terms & Privacy Policy',
-                    subtitle: 'Terms of service, refund & privacy',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const TermsAndPrivacyScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Logout Option
-            if (isLoggedIn)
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: _buildMenuItem(
-                  icon: Icons.logout_rounded,
-                  title: 'Log Out',
-                  subtitle: 'Sign out from this device',
-                  iconColor: AppColors.primaryRed,
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Log Out?'),
-                        content: const Text(
-                          'Are you sure you want to sign out from K MART?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              authProvider.signOut();
-                              context.read<OrdersProvider>().clearOrders();
-                              context.read<CartProvider>().clearCartOnLogout();
-                              Navigator.pop(context);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryRed,
-                            ),
-                            child: const Text('Log Out'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
                 ),
               ),
-            const SizedBox(height: 30),
-          ],
-        ),
       ),
     );
   }

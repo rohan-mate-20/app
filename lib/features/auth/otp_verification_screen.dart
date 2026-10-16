@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
 import '../checkout/checkout_flow_screen.dart';
@@ -44,6 +45,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   String get _enteredOtp => _controllers.map((c) => c.text).join();
 
   void _handleVerify() async {
+    final authProvider = context.read<AuthProvider>();
+
+    if (authProvider.isOtpExpired) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OTP has expired. Please tap Resend OTP to receive a new code.'),
+          backgroundColor: AppColors.primaryRed,
+        ),
+      );
+      return;
+    }
+
     final otp = _enteredOtp;
     if (otp.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,12 +68,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       return;
     }
 
-    final authProvider = context.read<AuthProvider>();
     final success = await authProvider.verifyOtp(otp);
 
     if (!mounted) return;
 
     if (success) {
+      final custId = authProvider.currentCustomer?.id;
+      context.read<NotificationProvider>().loadForCustomer(custId);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Login successful! Welcome to K MART.'),
@@ -69,6 +84,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       );
 
       if (widget.redirectToCheckout) {
+        // Pop OtpVerificationScreen, then replace LoginScreen with CheckoutFlowScreen
+        // so back navigation from Checkout returns directly to Cart instead of showing Login.
+        Navigator.of(context).pop();
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => const CheckoutFlowScreen(),
@@ -78,17 +96,33 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } else {
+      final isExpired = authProvider.isOtpExpired;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid OTP. Please check and try again.'),
+        SnackBar(
+          content: Text(
+            isExpired
+                ? 'OTP has expired. Please tap Resend OTP to receive a new code.'
+                : 'Invalid OTP. Please check and try again.',
+          ),
           backgroundColor: AppColors.primaryRed,
         ),
       );
     }
   }
 
-  void _handleResend() {
-    context.read<AuthProvider>().sendOtp(widget.phone);
+  void _handleResend() async {
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.canResend || authProvider.isLoading) return;
+    final sent = await authProvider.sendOtp(widget.phone);
+    if (!mounted) return;
+    if (sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A new 6-digit OTP has been sent via SMS.'),
+          backgroundColor: AppColors.navyDark,
+        ),
+      );
+    }
   }
 
   @override
@@ -236,38 +270,75 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Resend Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Didn't receive the OTP?",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
+              // OTP Validity & Resend Row
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: authProvider.isOtpExpired
+                      ? AppColors.primaryRedLight.withValues(alpha: 0.5)
+                      : AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: authProvider.isOtpExpired
+                        ? AppColors.primaryRed.withValues(alpha: 0.3)
+                        : AppColors.cardBorder,
                   ),
-                  if (authProvider.canResend)
-                    TextButton(
-                      onPressed: _handleResend,
-                      child: const Text(
-                        'Resend OTP',
-                        style: TextStyle(
-                          color: AppColors.primaryRed,
-                          fontWeight: FontWeight.bold,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 16,
+                          color: authProvider.isOtpExpired
+                              ? AppColors.primaryRed
+                              : AppColors.navyDark,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          authProvider.isOtpExpired
+                              ? 'OTP expired'
+                              : 'OTP expires in ${authProvider.formattedCountdown}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: authProvider.isOtpExpired
+                                ? AppColors.primaryRed
+                                : AppColors.navyDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (authProvider.canResend)
+                      TextButton(
+                        onPressed: _handleResend,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Resend OTP',
+                          style: TextStyle(
+                            color: AppColors.primaryRed,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        'Resend in ${authProvider.resendCooldown}s',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    )
-                  else
-                    Text(
-                      'Resend OTP in 00:${authProvider.resendCountdown.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.primaryRed,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
 

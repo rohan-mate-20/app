@@ -46,10 +46,18 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     super.initState();
     final authProvider = context.read<AuthProvider>();
     final customer = authProvider.currentCustomer;
-    _nameController = TextEditingController(text: customer?.name ?? '');
+    final initialName = (customer?.name != null && customer!.name!.isNotEmpty && customer.name != 'Customer')
+        ? customer.name!
+        : '';
+    _nameController = TextEditingController(text: initialName);
     _phoneController = TextEditingController(text: customer?.phone ?? '');
     _emailController = TextEditingController(text: customer?.email ?? '');
     _dobController = TextEditingController(text: customer?.dob ?? '');
+
+    // Skip step 1 if authenticated user already has their name and phone
+    if (authProvider.isLoggedIn && initialName.isNotEmpty && (customer?.phone.isNotEmpty == true)) {
+      _currentStep = 2;
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -126,9 +134,35 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     }
   }
 
+  bool _isSlotValid(DeliverySlotModel slot) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final allowedDates = List.generate(4, (i) {
+      final d = today.add(Duration(days: i));
+      return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    });
+    if (!allowedDates.contains(slot.slotDate)) return false;
+    if (slot.slotName.toLowerCase().contains('test') || slot.id.toLowerCase().contains('test')) return false;
+    if (slot.slotDate == allowedDates.first) {
+      final lower = slot.slotName.toLowerCase();
+      if (lower.contains('morning') && now.hour >= 11) return false;
+      if (lower.contains('evening') && now.hour >= 16) return false;
+    }
+    return true;
+  }
+
   void _previousStep() {
-    if (_currentStep > 1) {
+    final authProvider = context.read<AuthProvider>();
+    final customer = authProvider.currentCustomer;
+    final hasExistingProfile = authProvider.isLoggedIn &&
+        customer?.name != null &&
+        customer!.name!.isNotEmpty &&
+        customer.name != 'Customer';
+
+    if (_currentStep > 2) {
       setState(() => _currentStep--);
+    } else if (_currentStep == 2 && !hasExistingProfile) {
+      setState(() => _currentStep = 1);
     } else {
       Navigator.of(context).pop();
     }
@@ -150,6 +184,19 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
       return;
     }
 
+    final slot = storeProvider.selectedSlot;
+    if (_fulfillmentType == 'DELIVERY') {
+      if (slot == null || !_isSlotValid(slot)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The selected delivery slot is invalid or has expired. Please choose an upcoming slot.'),
+            backgroundColor: AppColors.primaryRed,
+          ),
+        );
+        return;
+      }
+    }
+
     final address = storeProvider.selectedAddress ?? StoreDeliveryProvider.defaultSampleAddress;
     final authCust = authProvider.currentCustomer ?? CustomerModel(
       id: 'cust_${DateTime.now().millisecondsSinceEpoch}',
@@ -160,7 +207,6 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
     final subtotal = cartProvider.itemTotal;
     final delFee = cartProvider.calculateDeliveryFee(isPickup: isPickup);
     final total = cartProvider.calculateGrandTotal(isPickup: isPickup);
-    final slot = storeProvider.selectedSlot;
 
     if (_paymentMethod == 'COD') {
       final order = await ordersProvider.placeCodOrder(
@@ -657,7 +703,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       Text(
-                        'A-302, Green Park Apartments, Baner Road, Pune - 411045',
+                        'Near K MART Store, Yashwant Nagar, Baramati - 413102',
                         style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ],
@@ -733,10 +779,10 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.primaryRed.withValues(alpha: 0.3)),
             ),
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.store_mall_directory_outlined, color: AppColors.primaryRed),
                     SizedBox(width: 8),
@@ -746,12 +792,12 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: 8),
+                Text(
                   '123 Supermarket Road, Main City Center',
                   style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'Collect your items anytime between 10 AM and 8 PM.',
                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -781,18 +827,29 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Date Tabs + Slot Cards Grid
+        // Date Tabs + Slot Cards Grid (Strictly 4 calendar dates, test & expired slots removed)
         () {
-          final uniqueDates = slots.map((s) => s.slotDate).toSet().toList();
-          uniqueDates.sort();
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final allowedDateStrings = List.generate(4, (i) {
+            final d = today.add(Duration(days: i));
+            return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+          });
 
-          final activeDate = (_selectedSlotDate != null && uniqueDates.contains(_selectedSlotDate))
+          // Only keep valid slots (no test slots, within 4 calendar dates, unexpired)
+          final validSlots = slots.where(_isSlotValid).toList();
+
+          final availableDates = allowedDateStrings.where((dStr) {
+            return validSlots.any((s) => s.slotDate == dStr);
+          }).toList();
+
+          final activeDate = (_selectedSlotDate != null && availableDates.contains(_selectedSlotDate))
               ? _selectedSlotDate!
-              : (selectedSlot != null && uniqueDates.contains(selectedSlot.slotDate))
+              : (selectedSlot != null && availableDates.contains(selectedSlot.slotDate))
                   ? selectedSlot.slotDate
-                  : (uniqueDates.isNotEmpty ? uniqueDates.first : '');
+                  : (availableDates.isNotEmpty ? availableDates.first : '');
 
-          final dateSlots = slots.where((s) => s.slotDate == activeDate).toList();
+          final dateSlots = validSlots.where((s) => s.slotDate == activeDate).toList();
           final Map<String, DeliverySlotModel> slotByName = {};
           for (final s in dateSlots) {
             if (!slotByName.containsKey(s.slotName)) {
@@ -800,9 +857,9 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
             }
           }
           List<DeliverySlotModel> displaySlots = slotByName.values.toList();
-          if (displaySlots.isEmpty && slots.isNotEmpty) {
+          if (displaySlots.isEmpty && validSlots.isNotEmpty) {
             final Map<String, DeliverySlotModel> fallbackByName = {};
-            for (final s in slots) {
+            for (final s in validSlots) {
               if (!fallbackByName.containsKey(s.slotName)) {
                 fallbackByName[s.slotName] = s;
               }
@@ -813,27 +870,28 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Horizontal Date Selector
-              if (uniqueDates.isNotEmpty) ...[
+              // Horizontal Date Selector (Strictly 4 dates)
+              if (availableDates.isNotEmpty) ...[
                 SizedBox(
                   height: 40,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: uniqueDates.length,
+                    itemCount: availableDates.length,
                     itemBuilder: (context, index) {
-                      final dStr = uniqueDates[index];
+                      final dStr = availableDates[index];
                       final isSelected = activeDate == dStr;
                       DateTime? dt = DateTime.tryParse(dStr);
                       String label = dStr;
                       if (dt != null) {
-                        final now = DateTime.now();
-                        final today = DateTime(now.year, now.month, now.day);
                         final slotDay = DateTime(dt.year, dt.month, dt.day);
                         final diffDays = slotDay.difference(today).inDays;
                         if (diffDays == 0) {
                           label = 'Today';
                         } else if (diffDays == 1) {
                           label = 'Tomorrow';
+                        } else if (diffDays == 2) {
+                          const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          label = 'Day After (${weekdays[dt.weekday - 1]})';
                         } else {
                           const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                           label = '${weekdays[dt.weekday - 1]}, ${dt.day}/${dt.month}';
@@ -854,11 +912,10 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                           ),
                           onSelected: (_) {
                             setState(() => _selectedSlotDate = dStr);
-                            final firstSlot = slots.firstWhere(
-                              (s) => s.slotDate == dStr,
-                              orElse: () => slots.first,
-                            );
-                            storeProvider.selectSlot(firstSlot);
+                            final matchingSlots = validSlots.where((s) => s.slotDate == dStr).toList();
+                            if (matchingSlots.isNotEmpty) {
+                              storeProvider.selectSlot(matchingSlots.first);
+                            }
                           },
                         ),
                       );
@@ -1106,7 +1163,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
               const SizedBox(height: 6),
               Text(
                 address?.fullAddressString ??
-                    'A-302, Green Park Apartments, Baner Road, Pune - 411045',
+                    'Near K MART Store, Yashwant Nagar, Baramati - 413102',
                 style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),

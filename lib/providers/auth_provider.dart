@@ -11,15 +11,24 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isLoggedIn = false;
   String _phoneNumber = '';
-  int _resendCountdown = 30;
+
+  static const int otpValiditySeconds = 300;
+  int _otpRemainingSeconds = otpValiditySeconds;
+  int _resendCooldown = 30;
   Timer? _countdownTimer;
 
   CustomerModel? get currentCustomer => _currentCustomer;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _isLoggedIn;
   String get phoneNumber => _phoneNumber;
-  int get resendCountdown => _resendCountdown;
-  bool get canResend => _resendCountdown == 0;
+  int get resendCountdown => _otpRemainingSeconds;
+  int get otpRemainingSeconds => _otpRemainingSeconds;
+  int get resendCooldown => _resendCooldown;
+  bool get isOtpExpired => _otpRemainingSeconds == 0;
+  bool get canResend => (_resendCooldown == 0 || _otpRemainingSeconds == 0) && !_isLoading;
+
+  String get formattedCountdown =>
+      '${(_otpRemainingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_otpRemainingSeconds % 60).toString().padLeft(2, '0')}';
 
   AuthProvider() {
     _initializeUser();
@@ -45,20 +54,31 @@ class AuthProvider with ChangeNotifier {
 
   void startResendTimer() {
     _countdownTimer?.cancel();
-    _resendCountdown = 30;
+    _otpRemainingSeconds = otpValiditySeconds;
+    _resendCooldown = 30;
     notifyListeners();
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendCountdown > 0) {
-        _resendCountdown--;
+      bool changed = false;
+      if (_otpRemainingSeconds > 0) {
+        _otpRemainingSeconds--;
+        changed = true;
+      }
+      if (_resendCooldown > 0) {
+        _resendCooldown--;
+        changed = true;
+      }
+      if (changed) {
         notifyListeners();
-      } else {
+      }
+      if (_otpRemainingSeconds == 0 && _resendCooldown == 0) {
         timer.cancel();
       }
     });
   }
 
   Future<bool> sendOtp(String phone) async {
+    if (_isLoading) return false;
     _isLoading = true;
     _phoneNumber = phone;
     notifyListeners();
@@ -72,12 +92,21 @@ class AuthProvider with ChangeNotifier {
     return success;
   }
 
-  Future<bool> verifyOtp(String otp, {String? name, String? email}) async {
+  Future<bool> verifyOtp(String otp, {String? name, String? email, DateTime? customNow}) async {
+    if (_isLoading) return false;
+
+    // Authoritative expiration validation (300 seconds)
+    if (_authService.isOtpExpired(customNow)) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     _isLoading = true;
     notifyListeners();
 
     try {
-      final authRes = await _authService.verifyOtp(_phoneNumber, otp);
+      final authRes = await _authService.verifyOtp(_phoneNumber, otp, customNow);
       final authUser = authRes.user;
 
       if (authUser == null) {
@@ -108,6 +137,7 @@ class AuthProvider with ChangeNotifier {
       _isLoggedIn = true;
       _isLoading = false;
       _countdownTimer?.cancel();
+      _otpRemainingSeconds = 0;
       notifyListeners();
       return true;
     } on AuthException catch (ae) {

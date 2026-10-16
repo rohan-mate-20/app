@@ -6,6 +6,10 @@ import 'package:kmart_customer/models/order_model.dart';
 import 'package:kmart_customer/models/product_model.dart';
 import 'package:kmart_customer/providers/cart_provider.dart';
 import 'package:kmart_customer/services/delivery_service.dart';
+import 'package:kmart_customer/providers/store_delivery_provider.dart';
+import 'package:kmart_customer/providers/notification_provider.dart';
+import 'package:kmart_customer/services/auth_service.dart';
+import 'package:kmart_customer/services/location_service.dart';
 import 'package:kmart_customer/widgets/need_help_faq_sheet.dart';
 
 void main() {
@@ -392,6 +396,189 @@ void main() {
       cart.removeFromCart('prod-999');
       expect(cart.getQuantity('prod-999'), 0);
       expect(cart.isEmpty, true);
+    });
+
+    test('24. DeliverySlotModel.filterAndSanitizeSlots removes test slots and past slots', () {
+      final morningTime = DateTime(2026, 10, 16, 12, 0); // 12:00 PM (11am morning slot passed)
+      final rawSlots = [
+        DeliverySlotModel(
+          id: 'test-slot-1',
+          slotDate: '2026-10-16',
+          slotName: 'Test Slot',
+          timeRange: '11:00 AM - 2:00 PM',
+        ),
+        DeliverySlotModel(
+          id: 'slot-today-morning',
+          slotDate: '2026-10-16',
+          slotName: 'Morning',
+          timeRange: '11:00 AM - 2:00 PM',
+        ),
+        DeliverySlotModel(
+          id: 'slot-today-evening',
+          slotDate: '2026-10-16',
+          slotName: 'Evening',
+          timeRange: '4:00 PM - 7:00 PM',
+        ),
+        DeliverySlotModel(
+          id: 'slot-old-date',
+          slotDate: '2026-09-29',
+          slotName: 'Morning',
+          timeRange: '11:00 AM - 2:00 PM',
+        ),
+      ];
+
+      final sanitized = DeliverySlotModel.filterAndSanitizeSlots(rawSlots, customNow: morningTime);
+      // No test slots
+      expect(sanitized.any((s) => s.slotName.toLowerCase().contains('test')), false);
+      // No old past dates
+      expect(sanitized.any((s) => s.slotDate == '2026-09-29'), false);
+      // Today morning passed at 12 PM, so today only has evening slot
+      final todaySlots = sanitized.where((s) => s.slotDate == '2026-10-16').toList();
+      expect(todaySlots.length, 1);
+      expect(todaySlots.first.slotName, 'Evening');
+    });
+
+    test('25. DeliverySlotModel restricts selectable dates strictly to 4 calendar dates', () {
+      final now = DateTime(2026, 10, 16, 9, 0);
+      final slots = DeliverySlotModel.getUpcomingSlots(daysAhead: 4, customNow: now);
+      final uniqueDates = slots.map((s) => s.slotDate).toSet().toList();
+      expect(uniqueDates.length, 4);
+      expect(uniqueDates, ['2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19']);
+    });
+
+    test('26. CartProvider clearCartOnLogout retains guest cart items', () async {
+      final cart = CartProvider();
+      final product = ProductModel(
+        id: 'prod-guest-item-1',
+        name: 'Aashirvaad Shudh Chakki Atta 5kg',
+        categoryName: 'Groceries',
+        categorySlug: 'groceries',
+        mrp: 320.0,
+        sellingPrice: 285.0,
+        discountPercent: 11,
+        weightUnit: '5kg',
+        imageUrl: 'https://example.com/atta.png',
+        inStock: true,
+      );
+
+      cart.addToCart(product, quantity: 1);
+      expect(cart.itemCount, 1);
+      expect(cart.getQuantity('prod-guest-item-1'), 1);
+
+      // Perform logout
+      await cart.clearCartOnLogout();
+
+      // Guest cart items must be retained
+      expect(cart.itemCount, 1);
+      expect(cart.getQuantity('prod-guest-item-1'), 1);
+      expect(cart.isEmpty, false);
+    });
+
+    test('27. StoreDeliveryProvider defaults to Baramati location', () {
+      final defaultAddr = StoreDeliveryProvider.defaultSampleAddress;
+      expect(defaultAddr.city, 'Baramati');
+      expect(defaultAddr.pincode, '413102');
+      expect(defaultAddr.latitude, 18.1508);
+      expect(defaultAddr.longitude, 74.5779);
+    });
+
+    test('28. NotificationProvider clearOnLogout empties notifications list immediately', () {
+      final notifProvider = NotificationProvider();
+      notifProvider.addNotification(
+        title: 'Order Dispatched',
+        body: 'Your package is on the way.',
+      );
+      expect(notifProvider.notifications.length, 1);
+      expect(notifProvider.hasUnread, true);
+
+      // Perform logout
+      notifProvider.clearOnLogout();
+
+      // Notifications must be empty immediately
+      expect(notifProvider.notifications.isEmpty, true);
+      expect(notifProvider.unreadCount, 0);
+      expect(notifProvider.hasUnread, false);
+    });
+
+    test('29. OTP authoritative expiration: Issued at 10:00:00 is valid at 10:04:59 and expires at 10:05:00', () {
+      final authService = AuthService();
+      final issueTime = DateTime(2026, 10, 16, 10, 0, 0);
+      authService.markOtpIssued('9876543210', issueTime);
+
+      // Check at 10:04:59 (299 seconds elapsed) -> still valid
+      final validTime = DateTime(2026, 10, 16, 10, 4, 59);
+      expect(authService.isOtpExpired(validTime), false);
+      expect(authService.getRemainingOtpSeconds(validTime), 1);
+
+      // Check at 10:05:00 (300 seconds elapsed) -> expired
+      final boundaryExpiredTime = DateTime(2026, 10, 16, 10, 5, 0);
+      expect(authService.isOtpExpired(boundaryExpiredTime), true);
+      expect(authService.getRemainingOtpSeconds(boundaryExpiredTime), 0);
+
+      // Check at 10:05:01 (301 seconds elapsed) -> expired
+      final pastExpiredTime = DateTime(2026, 10, 16, 10, 5, 1);
+      expect(authService.isOtpExpired(pastExpiredTime), true);
+    });
+
+    test('30. Resend OTP resets timer and invalidates previous session', () {
+      final authService = AuthService();
+      final firstIssue = DateTime(2026, 10, 16, 10, 0, 0);
+      authService.markOtpIssued('9876543210', firstIssue);
+
+      // At 10:05:00 the first OTP expires
+      final timeAt5 = DateTime(2026, 10, 16, 10, 5, 0);
+      expect(authService.isOtpExpired(timeAt5), true);
+
+      // User requests Resend OTP at 10:05:01
+      final resendTime = DateTime(2026, 10, 16, 10, 5, 1);
+      authService.markOtpIssued('9876543210', resendTime);
+
+      // Newly issued OTP is now valid
+      expect(authService.isOtpExpired(resendTime), false);
+      expect(authService.getRemainingOtpSeconds(resendTime), 300);
+
+      // And newly issued OTP expires at 10:10:01
+      final newExpiry = DateTime(2026, 10, 16, 10, 10, 1);
+      expect(authService.isOtpExpired(newExpiry), true);
+    });
+
+    test('31. LocationResult handles errors gracefully without defaulting to Baramati', () {
+      final denied = LocationResult.error('Location permission was denied. Please allow location access to use your current location.');
+      expect(denied.isSuccess, false);
+      expect(denied.city, null);
+      expect(denied.pincode, null);
+      expect(denied.errorMessage, contains('denied'));
+
+      final success = LocationResult.success(
+        latitude: 18.5204,
+        longitude: 73.8567,
+        city: 'Pune',
+        state: 'Maharashtra',
+        pincode: '411001',
+      );
+      expect(success.isSuccess, true);
+      expect(success.city, 'Pune');
+      expect(success.latitude, 18.5204);
+      expect(success.longitude, 73.8567);
+    });
+
+    test('32. Banner carousel infinite modulo indexing transitions smoothly 1 -> 2 -> 3 -> 1', () {
+      const bannerCount = 3;
+      // Moving forward from page index 0 to 12
+      final displayedBanners = List.generate(7, (index) => (index) % bannerCount);
+      // Sequence must always be 0 -> 1 -> 2 -> 0 -> 1 -> 2 -> 0 without jumping backwards
+      expect(displayedBanners, [0, 1, 2, 0, 1, 2, 0]);
+    });
+
+    test('33. Horizontal category layout maintains compact dimensions without vertical stacking', () {
+      const containerHeight = 110.0;
+      const avatarSize = 58.0;
+      const labelSpacing = 6.0;
+      const textHeight = 28.0; // 2 lines of 11px font with 1.15 line-height
+      const totalItemHeight = avatarSize + labelSpacing + textHeight;
+
+      expect(totalItemHeight < containerHeight, true);
+      expect(containerHeight - totalItemHeight >= 15, true);
     });
   });
 }

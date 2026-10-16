@@ -127,6 +127,12 @@ class StoreDeliveryProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void clearAddresses() {
+    _addresses = [];
+    _selectedAddress = null;
+    notifyListeners();
+  }
+
   void selectSlot(DeliverySlotModel slot) {
     _selectedSlot = slot;
     notifyListeners();

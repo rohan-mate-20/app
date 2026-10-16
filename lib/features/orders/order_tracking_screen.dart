@@ -220,7 +220,7 @@ class OrderTrackingScreen extends StatelessWidget {
                   Text(
                     order.isPickup
                         ? 'K MART Baramati Central Store, Main Road, Baramati, Maharashtra'
-                        : (order.deliveryAddress?.fullAddressString ?? '123, Green Park, Pune'),
+                        : (order.deliveryAddress?.fullAddressString ?? 'Near K MART Store, Yashwant Nagar, Baramati'),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,

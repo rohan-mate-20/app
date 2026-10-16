@@ -32,9 +32,10 @@ class DeliverySlotModel {
   }
 
   /// Returns upcoming delivery slots (11:00 AM - 2:00 PM and 4:00 PM - 7:00 PM).
+  /// Strictly restricts selection to 4 calendar dates: Today, Tomorrow, Day after tomorrow, 3 days from today.
   /// Only shows future slots for today (omits 11-2 if past 11am; omits both if past 4pm).
-  /// Adds future dates (Tomorrow and upcoming days) with both 11-2 and 4-7 slots.
-  static List<DeliverySlotModel> getUpcomingSlots({int daysAhead = 7, DateTime? customNow}) {
+  /// Adds future dates with both 11-2 and 4-7 slots.
+  static List<DeliverySlotModel> getUpcomingSlots({int daysAhead = 4, DateTime? customNow}) {
     final now = customNow ?? DateTime.now();
     final List<DeliverySlotModel> result = [];
 
@@ -87,6 +88,66 @@ class DeliverySlotModel {
     }
 
     return result;
+  }
+
+  /// Sanitizes slots from database:
+  /// 1. Removes test slots
+  /// 2. Restricts to strictly the 4 calendar dates (Today + 3 upcoming days)
+  /// 3. Removes expired time slots for Today
+  static List<DeliverySlotModel> filterAndSanitizeSlots(
+    List<DeliverySlotModel> rawSlots, {
+    DateTime? customNow,
+  }) {
+    final now = customNow ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final allowedDateStrings = List.generate(4, (i) {
+      final d = today.add(Duration(days: i));
+      return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    }).toSet();
+
+    final todayStr = allowedDateStrings.first;
+    final List<DeliverySlotModel> filtered = [];
+
+    for (final slot in rawSlots) {
+      // Filter out test slots
+      if (slot.slotName.toLowerCase().contains('test') || slot.id.toLowerCase().contains('test')) {
+        continue;
+      }
+      // Restrict strictly to the 4 calendar days
+      if (!allowedDateStrings.contains(slot.slotDate)) {
+        continue;
+      }
+      // Remove passed slots for Today
+      if (slot.slotDate == todayStr) {
+        final nameLower = slot.slotName.toLowerCase();
+        if (nameLower.contains('morning') && now.hour >= 11) {
+          continue;
+        }
+        if (nameLower.contains('evening') && now.hour >= 16) {
+          continue;
+        }
+      }
+      filtered.add(slot);
+    }
+
+    // Merge defaults for any missing day in the 4-day window
+    final defaults = getUpcomingSlots(daysAhead: 4, customNow: now);
+    for (final defSlot in defaults) {
+      final exists = filtered.any(
+        (s) => s.slotDate == defSlot.slotDate && s.slotName.toLowerCase() == defSlot.slotName.toLowerCase(),
+      );
+      if (!exists) {
+        filtered.add(defSlot);
+      }
+    }
+
+    filtered.sort((a, b) {
+      final c = a.slotDate.compareTo(b.slotDate);
+      if (c != 0) return c;
+      return a.slotName.compareTo(b.slotName);
+    });
+
+    return filtered;
   }
 
   static List<DeliverySlotModel> get defaultSlots => getUpcomingSlots();

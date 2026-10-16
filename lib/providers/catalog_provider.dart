@@ -199,11 +199,13 @@ class CatalogProvider with ChangeNotifier {
   List<ProductModel> get popularProducts {
     if (_allProducts.isEmpty) return [];
     final inStockList = _allProducts.where((p) => p.stockQuantity >= 5).toList();
-    final priority = inStockList.where((p) => p.discountPercent > 0 || (p.brand != null && p.brand != 'K MART')).toList();
-    if (priority.isNotEmpty) {
-      return priority.take(16).toList();
-    }
-    return inStockList.take(16).toList();
+    final sorted = List<ProductModel>.from(inStockList)
+      ..sort((a, b) {
+        final r = b.rating.compareTo(a.rating);
+        if (r != 0) return r;
+        return b.discountPercent.compareTo(a.discountPercent);
+      });
+    return sorted.take(8).toList();
   }
 
   List<ProductModel> get discountedProducts {

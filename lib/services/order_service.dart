@@ -11,7 +11,6 @@ import 'supabase_service.dart';
 import 'cart_service.dart';
 import 'checkout_service.dart';
 import 'delivery_service.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OrderService {
@@ -92,7 +91,7 @@ class OrderService {
           await _supabase.from('addresses').update({
             'latitude': 18.1508,
             'longitude': 74.5779,
-          }).eq('id', validAddressId!);
+          }).eq('id', validAddressId);
         } catch (_) {}
       } else {
         try {

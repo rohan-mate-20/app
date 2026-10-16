@@ -2,20 +2,50 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 import '../core/utils/validators.dart';
 import '../models/customer_model.dart';
 import 'supabase_service.dart';
 
 class AuthService {
-  final SupabaseClient _supabase = SupabaseService.client;
+  SupabaseClient get _supabase => SupabaseService.client;
   static const String _prefKeyCachedCustomer = 'kmart_cached_customer';
-
   static const String _prefKeyCustomerName = 'kmart_saved_customer_name';
+
+  static const int otpValiditySeconds = 300;
+  DateTime? _otpIssuedAt;
+  String? _lastOtpPhone;
+
+  DateTime? get otpIssuedAt => _otpIssuedAt;
+  String? get lastOtpPhone => _lastOtpPhone;
+
+  void markOtpIssued(String phone, [DateTime? customTime]) {
+    _otpIssuedAt = customTime ?? DateTime.now();
+    _lastOtpPhone = phone;
+  }
+
+  void invalidateOtp() {
+    _otpIssuedAt = null;
+    _lastOtpPhone = null;
+  }
+
+  bool isOtpExpired([DateTime? customNow]) {
+    if (_otpIssuedAt == null) return true;
+    final now = customNow ?? DateTime.now();
+    return now.difference(_otpIssuedAt!).inSeconds >= otpValiditySeconds;
+  }
+
+  int getRemainingOtpSeconds([DateTime? customNow]) {
+    if (_otpIssuedAt == null) return 0;
+    final now = customNow ?? DateTime.now();
+    final elapsed = now.difference(_otpIssuedAt!).inSeconds;
+    final remaining = otpValiditySeconds - elapsed;
+    return remaining > 0 ? remaining : 0;
+  }
 
   /// Send OTP to Indian phone number
   Future<bool> sendOtp(String phone) async {
     final normalized = Validators.normalizeIndianMobile(phone);
+    markOtpIssued(normalized);
     try {
       await _supabase.auth.signInWithOtp(phone: normalized);
       return true;
@@ -26,8 +56,11 @@ class AuthService {
     }
   }
 
-  /// Verify OTP code
-  Future<AuthResponse> verifyOtp(String phone, String otp) async {
+  /// Verify OTP code with authoritative 300-second expiration check
+  Future<AuthResponse> verifyOtp(String phone, String otp, [DateTime? customNow]) async {
+    if (isOtpExpired(customNow)) {
+      throw const AuthException('OTP has expired. Please request a new OTP.');
+    }
     final normalized = Validators.normalizeIndianMobile(phone);
     try {
       final response = await _supabase.auth.verifyOTP(
@@ -35,6 +68,7 @@ class AuthService {
         token: otp.trim(),
         type: OtpType.sms,
       );
+      invalidateOtp();
       return response;
     } on AuthException catch (ae) {
       debugPrint('❌ [AuthService] verifyOTP AuthException: code=${ae.statusCode}, message=${ae.message}');

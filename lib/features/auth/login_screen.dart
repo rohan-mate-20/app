@@ -28,6 +28,16 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && context.read<AuthProvider>().isLoggedIn) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _phoneController.dispose();
     super.dispose();

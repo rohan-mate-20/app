@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../models/address_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/store_delivery_provider.dart';
+import '../../services/location_service.dart';
 import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
 
@@ -19,11 +20,14 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
   final TextEditingController _houseController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
   final TextEditingController _landmarkController = TextEditingController();
-  final TextEditingController _pincodeController = TextEditingController(text: '411045');
-  final TextEditingController _cityController = TextEditingController(text: 'Pune');
+  final TextEditingController _pincodeController = TextEditingController(text: '413102');
+  final TextEditingController _cityController = TextEditingController(text: 'Baramati');
   final TextEditingController _stateController = TextEditingController(text: 'Maharashtra');
   String _selectedLabel = 'Home';
   bool _isDefault = true;
+  bool _isLocating = false;
+  double _currentLat = 18.1508;
+  double _currentLng = 74.5779;
 
   @override
   void initState() {
@@ -87,8 +91,8 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
       city: _cityController.text.trim(),
       state: _stateController.text.trim(),
       pincode: pin,
-      latitude: 18.1508,
-      longitude: 74.5779,
+      latitude: _currentLat,
+      longitude: _currentLng,
       isDefault: _isDefault,
     );
 
@@ -100,6 +104,63 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
         const SnackBar(
           content: Text('Delivery address saved successfully!'),
           backgroundColor: AppColors.successGreen,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleUseCurrentLocation() async {
+    if (_isLocating) return;
+    setState(() => _isLocating = true);
+
+    final result = await LocationService.getCurrentLocation();
+
+    if (!mounted) return;
+    setState(() => _isLocating = false);
+
+    if (result.isSuccess) {
+      if (result.latitude != null && result.longitude != null) {
+        _currentLat = result.latitude!;
+        _currentLng = result.longitude!;
+      }
+      if (result.house != null && result.house!.isNotEmpty) {
+        _houseController.text = result.house!;
+      }
+      if (result.area != null && result.area!.isNotEmpty) {
+        _areaController.text = result.area!;
+      }
+      if (result.city != null && result.city!.isNotEmpty) {
+        _cityController.text = result.city!;
+      }
+      if (result.state != null && result.state!.isNotEmpty) {
+        _stateController.text = result.state!;
+      }
+      if (result.pincode != null && result.pincode!.isNotEmpty) {
+        _pincodeController.text = result.pincode!;
+      }
+      setState(() {});
+
+      final locationName = [result.area, result.city]
+          .where((s) => s != null && s.isNotEmpty)
+          .join(', ');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            locationName.isNotEmpty
+                ? 'Current location detected: $locationName'
+                : 'Current location detected successfully.',
+          ),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
+    } else {
+      // Show understandable error message without silently substituting default address
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage ?? 'Could not determine location. Please enter manually.'),
+          backgroundColor: AppColors.primaryRed,
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -184,18 +245,7 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
 
                   // Use my current location Button
                   InkWell(
-                    onTap: () {
-                      _houseController.text = '123, Green Park';
-                      _areaController.text = 'Baner Road';
-                      _pincodeController.text = '411045';
-                      setState(() {});
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Auto-detected location: Pune (Store 1: 2.4 km)'),
-                          backgroundColor: AppColors.navyDark,
-                        ),
-                      );
-                    },
+                    onTap: _isLocating ? null : _handleUseCurrentLocation,
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -204,29 +254,41 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.cardBorder),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(
-                            Icons.my_location_rounded,
-                            color: AppColors.navyDark,
-                            size: 24,
-                          ),
-                          SizedBox(width: 14),
+                          if (_isLocating)
+                            const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: AppColors.primaryRed,
+                              ),
+                            )
+                          else
+                            const Icon(
+                              Icons.my_location_rounded,
+                              color: AppColors.navyDark,
+                              size: 24,
+                            ),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Use my current location',
-                                  style: TextStyle(
+                                  _isLocating ? 'Detecting current location...' : 'Use my current location',
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                     color: AppColors.navyDark,
                                   ),
                                 ),
                                 Text(
-                                  'Allow access to find nearest K MART store',
-                                  style: TextStyle(
+                                  _isLocating
+                                      ? 'Fetching GPS coordinates & address details'
+                                      : 'Tap to fetch your current delivery address',
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
                                   ),
@@ -234,10 +296,11 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                               ],
                             ),
                           ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppColors.navyDark,
-                          ),
+                          if (!_isLocating)
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.navyDark,
+                            ),
                         ],
                       ),
                     ),
@@ -259,7 +322,7 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                           child: Icon(
                             Icons.map_rounded,
                             size: 64,
-                            color: AppColors.navyDark.withOpacity(0.2),
+                            color: AppColors.navyDark.withValues(alpha: 0.2),
                           ),
                         ),
                         Positioned(
@@ -275,7 +338,7 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.06),
+                                  color: Colors.black.withValues(alpha: 0.06),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -283,16 +346,17 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                             child: const Row(
                               children: [
                                 Icon(
-                                  Icons.location_on,
+                                  Icons.store_mall_directory_rounded,
                                   color: AppColors.primaryRed,
                                   size: 14,
                                 ),
                                 SizedBox(width: 4),
                                 Text(
-                                  'K MART 2.4 km away',
+                                  'K MART Store • Baramati',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ],

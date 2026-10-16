@@ -5,7 +5,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/order_model.dart';
 import '../../providers/notification_provider.dart';
-import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
 import '../../widgets/need_help_faq_sheet.dart';
 import '../navigation/main_navigation_shell.dart';
@@ -313,7 +312,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                         Text(
                           order.isPickup
                               ? 'Main Road, Baramati, Maharashtra'
-                              : (order.deliveryAddress?.fullAddressString ?? '123, Green Park, Pune'),
+                              : (order.deliveryAddress?.fullAddressString ?? 'Near K MART Store, Yashwant Nagar, Baramati'),
                           style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
@@ -668,42 +667,96 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
             ),
             const SizedBox(height: 30),
 
-            // Action Buttons: View My Orders & Continue Shopping
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const OrdersScreen(),
+            // Action Buttons: View My Order & Continue Shopping (Responsive & Aligned)
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 340;
+                    final viewOrderBtn = SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const OrdersScreen(),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.navyDark, width: 1.5),
+                          foregroundColor: AppColors.navyDark,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: AppColors.navyDark),
-                      foregroundColor: AppColors.navyDark,
-                    ),
-                    child: const Text('View My Orders'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: KMartButton(
-                    label: 'Continue Shopping',
-                    suffixIcon: Icons.arrow_forward_rounded,
-                    onPressed: () {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (_) => const MainNavigationShell(),
+                        child: const Text(
+                          'View My Order',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        (route) => false,
+                      ),
+                    );
+
+                    final continueBtn = SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryRed,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => const MainNavigationShell(),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Continue Shopping',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(Icons.arrow_forward_rounded, size: 18),
+                          ],
+                        ),
+                      ),
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          SizedBox(width: double.infinity, child: viewOrderBtn),
+                          const SizedBox(height: 10),
+                          SizedBox(width: double.infinity, child: continueBtn),
+                        ],
                       );
-                    },
-                  ),
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: viewOrderBtn),
+                        const SizedBox(width: 12),
+                        Expanded(child: continueBtn),
+                      ],
+                    );
+                  },
                 ),
-              ],
+              ),
             ),
             const SizedBox(height: 20),
           ],
