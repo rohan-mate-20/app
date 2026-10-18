@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/address_model.dart';
 import '../../providers/auth_provider.dart';
@@ -307,10 +309,11 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Map visual card
+                  // Map visual card with Google Static Map
                   Container(
-                    height: 120,
+                    height: 130,
                     width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8EDF5),
                       borderRadius: BorderRadius.circular(14),
@@ -318,16 +321,53 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                     ),
                     child: Stack(
                       children: [
-                        Center(
-                          child: Icon(
-                            Icons.map_rounded,
-                            size: 64,
-                            color: AppColors.navyDark.withValues(alpha: 0.2),
+                        Positioned.fill(
+                          child: CachedNetworkImage(
+                            imageUrl:
+                                'https://maps.googleapis.com/maps/api/staticmap?center=$_currentLat,$_currentLng&zoom=15&size=600x260&scale=2&markers=color:red%7C$_currentLat,$_currentLng&key=${AppConstants.googleMapsApiKey}',
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: const Color(0xFFE8EDF5),
+                              child: Center(
+                                child: Icon(
+                                  Icons.map_rounded,
+                                  size: 56,
+                                  color: AppColors.navyDark.withValues(alpha: 0.2),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: const Color(0xFFE8EDF5),
+                              child: Center(
+                                child: Icon(
+                                  Icons.map_rounded,
+                                  size: 56,
+                                  color: AppColors.navyDark.withValues(alpha: 0.2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Soft dark gradient overlay for tag contrast
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.2),
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.35),
+                                ],
+                                stops: const [0.0, 0.45, 1.0],
+                              ),
+                            ),
                           ),
                         ),
                         Positioned(
-                          top: 12,
-                          right: 12,
+                          top: 10,
+                          right: 10,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -338,7 +378,7 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
+                                  color: Colors.black.withValues(alpha: 0.12),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -364,8 +404,8 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                           ),
                         ),
                         Positioned(
-                          bottom: 12,
-                          left: 12,
+                          bottom: 10,
+                          left: 10,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -374,6 +414,12 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                             decoration: BoxDecoration(
                               color: AppColors.successLight,
                               borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 4,
+                                ),
+                              ],
                             ),
                             child: const Text(
                               '✓ Delivery available at your location',

@@ -1,4 +1,6 @@
 class AppConstants {
+  static const String googleMapsApiKey = 'AIzaSyAJwNfFhAAIHahvaJAQBAgGVTUh6egXSLE';
+
   static const String genericProductImageFallback =
       'https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?auto=format&fit=crop&w=600&q=80';
 

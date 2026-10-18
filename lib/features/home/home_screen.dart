@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
@@ -36,40 +35,56 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static final List<Map<String, dynamic>> _bannerItems = [
     {
-      'title': 'Everything you need,\nRight at your doorstep.',
-      'subtitle': 'Daily essentials delivered fast.',
-      'tag': 'Fresh Daily',
-      'image': AppConstants.bannerFreshEssentials,
+      'title': 'CELEBRATE DIWALI',
+      'subtitle': 'Grand Gift Boxes, Dry Fruits, Traditional Diyas & Glowing Festive Decor!',
+      'tag': '🪔 DIWALI DHAMAKA • FLAT 40% OFF',
+      'buttonText': 'EXPLORE DIWALI DEALS',
+      'image': 'assets/images/banner_diwali_diyas.png',
       'gradientColors': [
-        AppColors.navyDark,
-        AppColors.navyDark,
-        AppColors.navyDark.withValues(alpha: 0.6),
-        Colors.transparent,
+        const Color(0xFF2E0854),
+        const Color(0xFF430D7A),
       ],
+      'accentColor': const Color(0xFFFFC727),
+      'titleColor': const Color(0xFFFFD43F),
     },
     {
-      'title': 'Dasara Festive Offer\nSpecial Deals on Sweets & Pooja',
-      'subtitle': 'Celebrate with festive grocery savings.',
-      'tag': 'Dasara Special',
-      'image': 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=800&q=80',
+      'title': 'DIWALI SWEETS',
+      'subtitle': 'Pure Ghee Kaju Katli, Mithai Gift Boxes & Handcrafted Festive Delights!',
+      'tag': '✨ FESTIVE SWEETS • FRESH KAJU KATLI',
+      'buttonText': 'SHOP SWEETS',
+      'image': 'assets/images/banner_diwali_sweets.jpg',
       'gradientColors': [
-        const Color(0xFF2E1065),
-        const Color(0xFF2E1065),
-        const Color(0xFF2E1065).withValues(alpha: 0.65),
-        Colors.transparent,
+        const Color(0xFF350960),
+        const Color(0xFF4A0E80),
       ],
+      'accentColor': const Color(0xFFFFC727),
+      'titleColor': const Color(0xFFFFD43F),
     },
     {
-      'title': 'Diwali Grand Dhamaka\nUp to 50% Off on Essentials',
-      'subtitle': 'Mega savings on dry fruits & family packs.',
-      'tag': 'Diwali Dhamaka',
-      'image': 'https://images.unsplash.com/photo-1508061252445-5350f3193a14?auto=format&fit=crop&w=800&q=80',
+      'title': 'POOJA ESSENTIALS',
+      'subtitle': 'Brass Diyas, Fragrant Agarbatti, Camphor, Flowers & Complete Puja Samagri!',
+      'tag': '🙏 DASARA & DIWALI POOJA • 30% OFF',
+      'buttonText': 'SHOP POOJA NEEDS',
+      'image': 'assets/images/banner_pooja_essentials.jpg',
       'gradientColors': [
-        const Color(0xFF1E1B4B),
-        const Color(0xFF1E1B4B),
-        const Color(0xFF1E1B4B).withValues(alpha: 0.65),
-        Colors.transparent,
+        const Color(0xFF2C0750),
+        const Color(0xFF3F0B74),
       ],
+      'accentColor': const Color(0xFFFFC727),
+      'titleColor': const Color(0xFFFFD43F),
+    },
+    {
+      'title': 'AUTHENTIC SPICES',
+      'subtitle': 'Handpicked Whole Spices, Fresh Ground Masalas & Daily Kitchen Essentials!',
+      'tag': '🌿 PURE SPICES • SPECIAL COMBO',
+      'buttonText': 'EXPLORE SPICES',
+      'image': 'assets/images/banner_spices_groceries.jpg',
+      'gradientColors': [
+        const Color(0xFF33095D),
+        const Color(0xFF450D7C),
+      ],
+      'accentColor': const Color(0xFFFFC727),
+      'titleColor': const Color(0xFFFFD43F),
     },
   ];
 
@@ -363,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final width = constraints.maxWidth;
-                          final height = width > 500 ? 200.0 : (width * 0.45).clamp(145.0, 175.0);
+                          final height = width > 500 ? 210.0 : (width * 0.46).clamp(155.0, 185.0);
 
                           return Column(
                             children: [
@@ -394,152 +409,190 @@ class _HomeScreenState extends State<HomeScreen> {
                                       final title = item['title'] as String;
                                       final subtitle = item['subtitle'] as String;
                                       final tag = item['tag'] as String;
-                                      final imageUrl = item['image'] as String;
-                                      final gradColors = item['gradientColors'] as List<Color>;
+                                      final buttonText = (item['buttonText'] as String?) ?? 'EXPLORE DEALS';
+                                      final imagePath = item['image'] as String;
+                                      final gradColors = (item['gradientColors'] as List<Color>?) ??
+                                          [const Color(0xFF2E0854), const Color(0xFF430D7A)];
+                                      final accentColor = (item['accentColor'] as Color?) ?? const Color(0xFFFFC727);
+                                      final titleColor = (item['titleColor'] as Color?) ?? const Color(0xFFFFD43F);
 
-                                    return Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                                      decoration: BoxDecoration(
-                                        color: gradColors.first,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Stack(
-                                        children: [
-                                          // Background Image on the right
-                                          Positioned(
-                                            right: 0,
-                                            top: 0,
-                                            bottom: 0,
-                                            width: (width - 32) * 0.45,
-                                            child: ClipRRect(
-                                              borderRadius: const BorderRadius.horizontal(
-                                                right: Radius.circular(20),
-                                              ),
-                                              child: CachedNetworkImage(
-                                                imageUrl: imageUrl,
-                                                fit: BoxFit.cover,
-                                                errorWidget: (context, url, error) => Container(
-                                                  color: AppColors.primaryRed.withValues(alpha: 0.3),
-                                                ),
-                                              ),
+                                      return GestureDetector(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => const CategoriesScreen(),
                                             ),
-                                          ),
-
-                                          // Gradient Overlay
-                                          Positioned.fill(
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                borderRadius: BorderRadius.circular(20),
-                                                gradient: LinearGradient(
-                                                  colors: gradColors,
-                                                  stops: const [0.0, 0.48, 0.65, 1.0],
-                                                  begin: Alignment.centerLeft,
-                                                  end: Alignment.centerRight,
-                                                ),
-                                              ),
+                                          );
+                                        },
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: gradColors,
+                                              begin: Alignment.centerLeft,
+                                              end: Alignment.centerRight,
                                             ),
-                                          ),
-
-                                          // Text Content
-                                          Positioned(
-                                            left: 0,
-                                            top: 0,
-                                            bottom: 0,
-                                            width: (width - 32) * 0.62,
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 16.0,
-                                                vertical: 14.0,
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: gradColors.first.withValues(alpha: 0.35),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
                                               ),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 2,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white.withValues(alpha: 0.2),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: Text(
-                                                      tag,
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                        letterSpacing: 0.4,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  Text(
-                                                    title,
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: width > 350 ? 15 : 13.5,
-                                                      fontWeight: FontWeight.w900,
-                                                      height: 1.15,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 3),
-                                                  Text(
-                                                    subtitle,
-                                                    style: const TextStyle(
-                                                      color: Colors.white70,
-                                                      fontSize: 10.5,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  const Spacer(),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      Navigator.of(context).push(
-                                                        MaterialPageRoute(
-                                                          builder: (_) => const CategoriesScreen(),
-                                                        ),
-                                                      );
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: AppColors.primaryRed,
-                                                      foregroundColor: Colors.white,
+                                            ],
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              // Left Text Content
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    // Top Tag Badge
+                                                    Container(
                                                       padding: const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6,
+                                                        horizontal: 8,
+                                                        vertical: 3,
                                                       ),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(8),
+                                                      decoration: BoxDecoration(
+                                                        color: accentColor,
+                                                        borderRadius: BorderRadius.circular(12),
+                                                      ),
+                                                      child: Text(
+                                                        tag,
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF28054D),
+                                                          fontSize: 9.5,
+                                                          fontWeight: FontWeight.w900,
+                                                          letterSpacing: 0.2,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
                                                       ),
                                                     ),
-                                                    child: const Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        Text(
-                                                          'Shop Now',
-                                                          style: TextStyle(
-                                                            fontSize: 11.5,
-                                                            fontWeight: FontWeight.bold,
+                                                    const SizedBox(height: 4),
+
+                                                    // Main Title
+                                                    Text(
+                                                      title,
+                                                      style: TextStyle(
+                                                        color: titleColor,
+                                                        fontSize: width > 350 ? 17 : 15,
+                                                        fontWeight: FontWeight.w900,
+                                                        letterSpacing: 0.3,
+                                                        height: 1.1,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 3),
+
+                                                    // Subtitle
+                                                    Text(
+                                                      subtitle,
+                                                      style: TextStyle(
+                                                        color: Colors.white.withValues(alpha: 0.92),
+                                                        fontSize: width > 350 ? 10.5 : 9.5,
+                                                        height: 1.2,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const Spacer(),
+
+                                                    // CTA Button
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 5,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: accentColor,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withValues(alpha: 0.2),
+                                                            blurRadius: 3,
+                                                            offset: const Offset(0, 1),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Text(
+                                                            buttonText,
+                                                            style: const TextStyle(
+                                                              color: Color(0xFF28054D),
+                                                              fontSize: 10.5,
+                                                              fontWeight: FontWeight.w900,
+                                                              letterSpacing: 0.2,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          const Icon(
+                                                            Icons.arrow_forward_rounded,
+                                                            size: 13,
+                                                            color: Color(0xFF28054D),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+
+                                              // Right Image with White Border Card
+                                              SizedBox(
+                                                width: (width - 48) * 0.38,
+                                                height: double.infinity,
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    border: Border.all(
+                                                      color: Colors.white.withValues(alpha: 0.95),
+                                                      width: 1.8,
+                                                    ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withValues(alpha: 0.25),
+                                                        blurRadius: 6,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  clipBehavior: Clip.antiAlias,
+                                                  child: imagePath.startsWith('assets/')
+                                                      ? Image.asset(
+                                                          imagePath,
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error, stackTrace) => Container(
+                                                            color: const Color(0xFF380A68),
+                                                            child: const Center(
+                                                              child: Icon(Icons.broken_image_rounded, color: Colors.white38),
+                                                            ),
+                                                          ),
+                                                        )
+                                                      : CachedNetworkImage(
+                                                          imageUrl: imagePath,
+                                                          fit: BoxFit.cover,
+                                                          errorWidget: (context, url, error) => Container(
+                                                            color: const Color(0xFF380A68),
                                                           ),
                                                         ),
-                                                        SizedBox(width: 4),
-                                                        Icon(Icons.arrow_forward, size: 13),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
+                                                ),
                                               ),
-                                            ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
-                            ),
                               const SizedBox(height: 8),
                               // Banner indicator dots
                               Row(
@@ -549,10 +602,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                   return AnimatedContainer(
                                     duration: const Duration(milliseconds: 300),
                                     margin: const EdgeInsets.symmetric(horizontal: 3),
-                                    width: isSelected ? 18 : 6,
+                                    width: isSelected ? 22 : 6,
                                     height: 6,
                                     decoration: BoxDecoration(
-                                      color: isSelected ? AppColors.primaryRed : AppColors.cardBorder,
+                                      color: isSelected ? const Color(0xFF380A68) : AppColors.cardBorder,
                                       borderRadius: BorderRadius.circular(3),
                                     ),
                                   );

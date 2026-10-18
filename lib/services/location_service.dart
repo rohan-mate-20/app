@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import '../core/constants/app_constants.dart';
 
 class LocationResult {
   final bool isSuccess;
@@ -160,8 +161,63 @@ class LocationService {
     }
   }
 
-  /// Reverse geocode coordinates using OpenStreetMap Nominatim with safe timeout
+  /// Reverse geocode coordinates using Google Maps Geocoding API with safe Nominatim fallback
   static Future<Map<String, String>?> reverseGeocodeCoordinates(double lat, double lng) async {
+    // 1. Google Maps Geocoding API (Preferred high-precision)
+    if (AppConstants.googleMapsApiKey.isNotEmpty) {
+      try {
+        final googleUri = Uri.parse(
+          'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${AppConstants.googleMapsApiKey}',
+        );
+        final response = await http.get(googleUri).timeout(const Duration(seconds: 4));
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body) as Map<String, dynamic>;
+          final status = data['status'] as String?;
+          if (status == 'OK') {
+            final results = data['results'] as List<dynamic>?;
+            if (results != null && results.isNotEmpty) {
+              final first = results.first as Map<String, dynamic>;
+              final components = (first['address_components'] as List<dynamic>?) ?? [];
+              String? house;
+              String? road;
+              String? sublocality;
+              String? city;
+              String? state;
+              String? pincode;
+
+              for (final comp in components) {
+                final types = ((comp['types'] as List<dynamic>?) ?? []).cast<String>();
+                final longName = comp['long_name']?.toString() ?? '';
+                if (types.contains('street_number')) house = longName;
+                if (types.contains('route')) road = longName;
+                if (types.contains('sublocality') || types.contains('sublocality_level_1')) sublocality = longName;
+                if (types.contains('locality')) city = longName;
+                if (types.contains('administrative_area_level_1')) state = longName;
+                if (types.contains('postal_code')) pincode = longName;
+              }
+
+              final areaParts = [road, sublocality].where((s) => s != null && s.isNotEmpty).toList();
+              final area = areaParts.isNotEmpty ? areaParts.join(', ') : null;
+              final formatted = first['formatted_address']?.toString();
+
+              return {
+                if (house != null && house.isNotEmpty) 'house': house,
+                if (area != null && area.isNotEmpty) 'area': area,
+                if (city != null && city.isNotEmpty) 'city': city,
+                if (state != null && state.isNotEmpty) 'state': state,
+                if (pincode != null && pincode.isNotEmpty) 'pincode': pincode,
+                if (formatted != null && formatted.isNotEmpty) 'addressLine': formatted,
+              };
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[LocationService] Google geocoding error: $e');
+      }
+    }
+
+    // 2. OpenStreetMap Nominatim fallback
     try {
       final uri = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1',
