@@ -5,11 +5,13 @@ import '../../providers/auth_provider.dart';
 import '../location/address_management_screen.dart';
 import '../../widgets/need_help_faq_sheet.dart';
 import '../auth/login_screen.dart';
+import '../auth/set_password_screen.dart';
 import '../legal/terms_and_privacy_screen.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/store_delivery_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../services/app_update_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -110,6 +112,28 @@ class ProfileScreen extends StatelessWidget {
                           title: 'Help & Customer Support',
                           subtitle: 'FAQs, toll-free support & complaints',
                           onTap: () => NeedHelpFaqSheet.show(context),
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildMenuItem(
+                          icon: Icons.lock_outline_rounded,
+                          title: 'Change Password',
+                          subtitle: 'Update your account login password',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SetPasswordScreen(
+                                  isChangePassword: true,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildMenuItem(
+                          icon: Icons.system_update_rounded,
+                          title: 'App Updates',
+                          subtitle: 'Version ${AppUpdateService.currentVersion} • Check for Play Store updates',
+                          onTap: () => AppUpdateService.showUpdatePrompt(context),
                         ),
                         const Divider(height: 1, indent: 56),
                         _buildMenuItem(

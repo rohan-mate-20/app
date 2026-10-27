@@ -6,6 +6,8 @@ import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/store_delivery_provider.dart';
+import '../../services/app_update_service.dart';
+import '../../services/platform_launcher_service.dart';
 import '../cart/cart_screen.dart';
 import '../categories/categories_screen.dart';
 import '../home/home_screen.dart';
@@ -59,6 +61,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       if (mounted) {
         context.read<CatalogProvider>().loadCatalog();
         context.read<StoreDeliveryProvider>().loadInitialData();
+        // Check for app update and prompt if a new version is available on Play Store
+        AppUpdateService.checkAndPromptUpdate(context);
+        // Request notification permission for order delivery updates on Android 13+
+        PlatformLauncherService.requestNotificationPermission();
       }
     });
   }

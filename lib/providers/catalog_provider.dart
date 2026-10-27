@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/product_model.dart';
 import '../models/category_model.dart';
@@ -32,19 +33,30 @@ class CatalogProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  Timer? _searchDebounce;
+
   CatalogProvider() {
     loadCatalog();
   }
 
-  Future<void> loadCatalog({String? storeId}) async {
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> loadCatalog({String? storeId, bool forceRefresh = false}) async {
+    if (forceRefresh) {
+      ProductService.clearCache();
+    }
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
       final results = await Future.wait([
-        _productService.fetchProducts(storeId: storeId, limit: 100),
-        _productService.fetchCategories(),
+        _productService.fetchProducts(storeId: storeId, limit: 100, forceRefresh: forceRefresh),
+        _productService.fetchCategories(forceRefresh: forceRefresh),
       ]);
 
       _allProducts = results[0] as List<ProductModel>;
@@ -97,6 +109,7 @@ class CatalogProvider with ChangeNotifier {
   }
 
   void clearSearch() {
+    _searchDebounce?.cancel();
     _searchQuery = '';
     _searchResults.clear();
     _isLoading = false;
@@ -104,6 +117,7 @@ class CatalogProvider with ChangeNotifier {
   }
 
   Future<void> setSearchQuery(String query) async {
+    _searchDebounce?.cancel();
     final clean = query.trim();
     _searchQuery = clean;
     if (clean.isEmpty) {
@@ -124,25 +138,27 @@ class CatalogProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // 2. Query whole database in Supabase
-    try {
-      final dbResults = await _productService.searchProducts(clean);
-      if (_searchQuery == clean) {
-        final existingIds = _searchResults.map((p) => p.id).toSet();
-        for (final item in dbResults) {
-          if (!existingIds.contains(item.id)) {
-            _searchResults.add(item);
+    // 2. High-concurrency debounced query to Supabase (prevents flooding database)
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final dbResults = await _productService.searchProducts(clean);
+        if (_searchQuery == clean) {
+          final existingIds = _searchResults.map((p) => p.id).toSet();
+          for (final item in dbResults) {
+            if (!existingIds.contains(item.id)) {
+              _searchResults.add(item);
+            }
           }
         }
+      } catch (e) {
+        debugPrint('[CatalogProvider] remote search error: $e');
+      } finally {
+        if (_searchQuery == clean) {
+          _isLoading = false;
+          notifyListeners();
+        }
       }
-    } catch (e) {
-      debugPrint('[CatalogProvider] remote search error: $e');
-    } finally {
-      if (_searchQuery == clean) {
-        _isLoading = false;
-        notifyListeners();
-      }
-    }
+    });
   }
 
   void setSortOption(ProductSortOption option) {

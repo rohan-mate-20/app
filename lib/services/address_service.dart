@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/address_model.dart';
 import 'supabase_service.dart';
 
@@ -13,7 +13,8 @@ class AddressService {
           .select()
           .eq('customer_id', customerId)
           .order('is_default', ascending: false)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 10));
 
       return (response as List).map((item) => AddressModel.fromJson(item)).toList();
     } catch (e) {

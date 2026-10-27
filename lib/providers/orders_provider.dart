@@ -75,6 +75,8 @@ class OrdersProvider with ChangeNotifier {
     String? scheduledDeliveryDate,
     String? deliverySlotTime,
   }) async {
+    // Prevent duplicate submission under high concurrency or fast tapping
+    if (_isLoading) return null;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

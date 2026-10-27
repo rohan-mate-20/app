@@ -10,6 +10,8 @@ class AuthService {
   SupabaseClient get _supabase => SupabaseService.client;
   static const String _prefKeyCachedCustomer = 'kmart_cached_customer';
   static const String _prefKeyCustomerName = 'kmart_saved_customer_name';
+  static const String _prefKeyHasUsedPassword = 'kmart_has_used_password';
+  static const String _prefKeyLastPhone = 'kmart_last_phone';
 
   static const int otpValiditySeconds = 300;
   DateTime? _otpIssuedAt;
@@ -17,6 +19,72 @@ class AuthService {
 
   DateTime? get otpIssuedAt => _otpIssuedAt;
   String? get lastOtpPhone => _lastOtpPhone;
+
+  bool get hasPasswordSet {
+    final user = _supabase.auth.currentUser;
+    return user?.userMetadata?['has_password'] == true;
+  }
+
+  Future<AuthResponse> signInWithPassword(String phone, String password) async {
+    final normalized = Validators.normalizeIndianMobile(phone);
+    try {
+      final response = await _supabase.auth.signInWithPassword(
+        phone: normalized,
+        password: password.trim(),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKeyHasUsedPassword, true);
+      final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
+      if (cleanDigits.length >= 10) {
+        await prefs.setString(_prefKeyLastPhone, cleanDigits.substring(cleanDigits.length - 10));
+      }
+      return response;
+    } on AuthException catch (ae) {
+      debugPrint('[AuthService] signInWithPassword AuthException: ${ae.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[AuthService] signInWithPassword error: $e');
+      rethrow;
+    }
+  }
+
+  Future<UserResponse> setPassword(String password) async {
+    try {
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(
+          password: password.trim(),
+          data: {'has_password': true},
+        ),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKeyHasUsedPassword, true);
+      return response;
+    } on AuthException catch (ae) {
+      debugPrint('[AuthService] setPassword AuthException: ${ae.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[AuthService] setPassword error: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> hasUsedPasswordBefore() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_prefKeyHasUsedPassword) ?? false;
+  }
+
+  Future<String?> getLastLoginPhone() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_prefKeyLastPhone);
+  }
+
+  Future<void> saveLastPhone(String phone) async {
+    final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleanDigits.length >= 10) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefKeyLastPhone, cleanDigits.substring(cleanDigits.length - 10));
+    }
+  }
 
   void markOtpIssued(String phone, [DateTime? customTime]) {
     _otpIssuedAt = customTime ?? DateTime.now();

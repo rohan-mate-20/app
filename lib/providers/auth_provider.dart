@@ -11,6 +11,7 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isLoggedIn = false;
   String _phoneNumber = '';
+  String? _authErrorMessage;
 
   static const int otpValiditySeconds = 300;
   int _otpRemainingSeconds = otpValiditySeconds;
@@ -21,6 +22,15 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _isLoggedIn;
   String get phoneNumber => _phoneNumber;
+  String? get authErrorMessage => _authErrorMessage;
+  bool get hasPassword => _authService.hasPasswordSet;
+  Future<bool> hasUsedPasswordBefore() => _authService.hasUsedPasswordBefore();
+  Future<String?> getLastLoginPhone() => _authService.getLastLoginPhone();
+
+  void clearAuthError() {
+    _authErrorMessage = null;
+    notifyListeners();
+  }
   int get resendCountdown => _otpRemainingSeconds;
   int get otpRemainingSeconds => _otpRemainingSeconds;
   int get resendCooldown => _resendCooldown;
@@ -148,6 +158,94 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('❌ [AuthProvider] verifyOtp error: $e');
       _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Sign in using Mobile Number + Password (no OTP sent)
+  Future<bool> signInWithPassword(String phone, String password) async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    _authErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final authRes = await _authService.signInWithPassword(phone, password);
+      final authUser = authRes.user;
+
+      if (authUser == null) {
+        _isLoading = false;
+        _authErrorMessage = 'Wrong mobile number or password.';
+        notifyListeners();
+        return false;
+      }
+
+      final customer = await _authService.lookupCustomerByAuthUserId(authUser.id, fallbackPhone: phone);
+
+      if (customer != null) {
+        _currentCustomer = customer.copyWith(isVerified: true);
+      } else {
+        _currentCustomer = CustomerModel(
+          id: authUser.id,
+          phone: phone,
+          name: 'Customer',
+          authUserId: authUser.id,
+          isVerified: true,
+        );
+      }
+
+      _isLoggedIn = true;
+      _phoneNumber = phone;
+      _isLoading = false;
+      _authErrorMessage = null;
+      notifyListeners();
+      return true;
+    } on AuthException catch (ae) {
+      debugPrint('❌ [AuthProvider] signInWithPassword AuthException: ${ae.message}');
+      _isLoading = false;
+      final msg = ae.message.toLowerCase();
+      if (msg.contains('invalid login credentials') ||
+          msg.contains('invalid credentials') ||
+          msg.contains('wrong password') ||
+          msg.contains('user not found')) {
+        _authErrorMessage = 'Wrong mobile number or password.';
+      } else {
+        _authErrorMessage = ae.message.isNotEmpty ? ae.message : 'Wrong mobile number or password.';
+      }
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('❌ [AuthProvider] signInWithPassword error: $e');
+      _isLoading = false;
+      _authErrorMessage = 'Wrong mobile number or password.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update / set user password in Supabase Auth metadata
+  Future<bool> setPassword(String password) async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    _authErrorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.setPassword(password);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on AuthException catch (ae) {
+      debugPrint('❌ [AuthProvider] setPassword AuthException: ${ae.message}');
+      _isLoading = false;
+      _authErrorMessage = ae.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('❌ [AuthProvider] setPassword error: $e');
+      _isLoading = false;
+      _authErrorMessage = e.toString();
       notifyListeners();
       return false;
     }

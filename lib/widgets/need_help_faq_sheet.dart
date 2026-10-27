@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../services/platform_launcher_service.dart';
 
 class NeedHelpFaqSheet extends StatelessWidget {
   const NeedHelpFaqSheet({super.key});
@@ -181,6 +182,40 @@ class NeedHelpFaqSheet extends StatelessWidget {
                               ),
                             ),
                           ),
+                          if (faq['question']!.toLowerCase().contains('contact')) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => PlatformLauncherService.makePhoneCall('+919975040003'),
+                                    icon: const Icon(Icons.call_rounded, size: 16),
+                                    label: const Text('Call Us', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryRed,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => PlatformLauncherService.openSms('+919975040003', message: 'Hello K MART, I need support with my order.'),
+                                    icon: const Icon(Icons.sms_rounded, size: 16),
+                                    label: const Text('Send SMS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.navyDark,
+                                      side: const BorderSide(color: AppColors.navyDark),
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),

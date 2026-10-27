@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notification_model.dart';
+import '../services/platform_launcher_service.dart';
 
 class NotificationProvider with ChangeNotifier {
   static const String _defaultStorageKey = 'kmart_notifications_v1';
@@ -87,6 +88,7 @@ class NotificationProvider with ChangeNotifier {
     required String body,
     String? orderId,
     String type = 'order',
+    bool showSystemBanner = true,
   }) {
     final newNotification = NotificationModel(
       id: 'notif_${DateTime.now().millisecondsSinceEpoch}',
@@ -101,6 +103,13 @@ class NotificationProvider with ChangeNotifier {
     _notifications.insert(0, newNotification);
     notifyListeners();
     _saveToStorage();
+
+    if (showSystemBanner) {
+      PlatformLauncherService.showSystemNotification(
+        title: title,
+        body: body,
+      );
+    }
   }
 
   void markAsRead(String id) {

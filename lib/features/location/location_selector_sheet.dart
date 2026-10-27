@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -30,6 +31,16 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
   bool _isLocating = false;
   double _currentLat = 18.1508;
   double _currentLng = 74.5779;
+
+  String _getMapTileUrl(double lat, double lng, {int zoom = 15}) {
+    final n = 1 << zoom;
+    final x = ((lng + 180.0) / 360.0 * n).floor().clamp(0, n - 1);
+    final latRad = lat * math.pi / 180.0;
+    final y = ((1.0 - (math.log(math.tan(latRad) + (1.0 / math.cos(latRad))) / math.pi)) / 2.0 * n)
+        .floor()
+        .clamp(0, n - 1);
+    return 'https://a.basemaps.cartocdn.com/rastertiles/voyager/$zoom/$x/$y@2x.png';
+  }
 
   @override
   void initState() {
@@ -309,7 +320,7 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Map visual card with Google Static Map
+                  // Map visual card with Google Static Map & high-res tile fallback
                   Container(
                     height: 130,
                     width: double.infinity,
@@ -326,25 +337,70 @@ class _LocationSelectorSheetState extends State<LocationSelectorSheet> {
                             imageUrl:
                                 'https://maps.googleapis.com/maps/api/staticmap?center=$_currentLat,$_currentLng&zoom=15&size=600x260&scale=2&markers=color:red%7C$_currentLat,$_currentLng&key=${AppConstants.googleMapsApiKey}',
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: const Color(0xFFE8EDF5),
-                              child: Center(
-                                child: Icon(
-                                  Icons.map_rounded,
-                                  size: 56,
-                                  color: AppColors.navyDark.withValues(alpha: 0.2),
+                            placeholder: (context, url) => CachedNetworkImage(
+                              imageUrl: _getMapTileUrl(_currentLat, _currentLng),
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: const Color(0xFFE8EDF5),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.map_rounded,
+                                    size: 56,
+                                    color: AppColors.navyDark.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: const Color(0xFFE8EDF5),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.map_rounded,
+                                    size: 56,
+                                    color: AppColors.navyDark.withValues(alpha: 0.2),
+                                  ),
                                 ),
                               ),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              color: const Color(0xFFE8EDF5),
-                              child: Center(
-                                child: Icon(
-                                  Icons.map_rounded,
-                                  size: 56,
-                                  color: AppColors.navyDark.withValues(alpha: 0.2),
+                            errorWidget: (context, url, error) => CachedNetworkImage(
+                              imageUrl: _getMapTileUrl(_currentLat, _currentLng),
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: const Color(0xFFE8EDF5),
+                              ),
+                              errorWidget: (context, url, err) => Container(
+                                color: const Color(0xFFE8EDF5),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.map_rounded,
+                                    size: 56,
+                                    color: AppColors.navyDark.withValues(alpha: 0.2),
+                                  ),
                                 ),
                               ),
+                            ),
+                          ),
+                        ),
+                        // Central Location Pin Marker
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 36,
+                                  color: AppColors.primaryRed,
+                                ),
+                                Container(
+                                  width: 8,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

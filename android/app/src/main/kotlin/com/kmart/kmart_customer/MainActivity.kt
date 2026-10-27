@@ -1,16 +1,26 @@
 package com.kmart.kmart_customer
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -21,13 +31,137 @@ import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "kmart/location"
+    private val PLATFORM_CHANNEL = "kmart/platform"
     private var pendingLocationResult: MethodChannel.Result? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
     private val PERMISSION_REQUEST_CODE = 2001
+    private val NOTIFICATION_PERMISSION_REQUEST_CODE = 2002
     private val bgExecutor: Executor = Executors.newSingleThreadExecutor()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Platform Utilities Channel (Play Store, Phone Dialer, SMS, Notifications)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLATFORM_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openPlayStore" -> {
+                    val pkg = call.argument<String>("packageName") ?: packageName
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (_: Exception) {
+                        try {
+                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(webIntent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("PLAY_STORE_ERROR", e.message, null)
+                        }
+                    }
+                }
+                "makePhoneCall" -> {
+                    val phone = call.argument<String>("phoneNumber") ?: ""
+                    try {
+                        // Uses ACTION_DIAL which opens phone dialer safely without sensitive CALL_PHONE permission
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("DIAL_ERROR", e.message, null)
+                    }
+                }
+                "openSms" -> {
+                    val phone = call.argument<String>("phoneNumber") ?: ""
+                    val message = call.argument<String>("message") ?: ""
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("sms:$phone")).apply {
+                            putExtra("sms_body", message)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("SMS_ERROR", e.message, null)
+                    }
+                }
+                "requestNotificationPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        if (!granted) {
+                            ActivityCompat.requestPermissions(
+                                this,
+                                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                                NOTIFICATION_PERMISSION_REQUEST_CODE
+                            )
+                        }
+                        result.success(granted)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "checkNotificationPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        result.success(granted)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "showNotification" -> {
+                    val title = call.argument<String>("title") ?: "K-Mart"
+                    val body = call.argument<String>("body") ?: ""
+                    val notificationId = call.argument<Int>("id") ?: (System.currentTimeMillis() % 100000).toInt()
+                    try {
+                        createNotificationChannel()
+                        val intent = Intent(this, MainActivity::class.java).apply {
+                            action = Intent.ACTION_MAIN
+                            addCategory(Intent.CATEGORY_LAUNCHER)
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        } else {
+                            PendingIntent.FLAG_UPDATE_CURRENT
+                        }
+                        val pendingIntent = PendingIntent.getActivity(this, notificationId, intent, flags)
+
+                        val smallIconResId = resources.getIdentifier("ic_stat_kmart", "drawable", packageName).let {
+                            if (it != 0) it else applicationInfo.icon
+                        }
+                        val largeIcon = getAppIconBitmap()
+
+                        val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+                            .setSmallIcon(smallIconResId)
+                            .setColor(0xFFE53935.toInt())
+                            .setContentTitle(title)
+                            .setContentText(body)
+                            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                            .setPriority(NotificationCompat.PRIORITY_HIGH)
+                            .setDefaults(NotificationCompat.DEFAULT_ALL)
+                            .setContentIntent(pendingIntent)
+                            .setAutoCancel(true)
+
+                        if (largeIcon != null) {
+                            builder.setLargeIcon(largeIcon)
+                        }
+
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        notificationManager.notify(notificationId, builder.build())
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("NOTIFICATION_ERROR", e.message, null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -226,6 +360,44 @@ class MainActivity : FlutterActivity() {
                     res?.error("PERMISSION_DENIED", "Location permission was denied.", null)
                 }
             }
+        }
+    }
+
+    companion object {
+        private const val NOTIFICATION_CHANNEL_ID = "kmart_orders_channel"
+    }
+
+    private fun getAppIconBitmap(): Bitmap? {
+        return try {
+            val drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher) ?: return null
+            if (drawable is BitmapDrawable) {
+                drawable.bitmap
+            } else {
+                val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 192
+                val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 192
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                drawable.setBounds(0, 0, canvas.width, canvas.height)
+                drawable.draw(canvas)
+                bitmap
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "K-Mart Notifications"
+            val descriptionText = "Order updates, status alerts and offers"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+                enableLights(true)
+                enableVibration(true)
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
     }
 }

@@ -7,17 +7,20 @@ import '../../widgets/kmart_button.dart';
 import '../../widgets/kmart_logo.dart';
 import '../checkout/checkout_flow_screen.dart';
 import '../../widgets/need_help_faq_sheet.dart';
+import 'set_password_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String phone;
   final bool isModal;
   final bool redirectToCheckout;
+  final bool isForgotPassword;
 
   const OtpVerificationScreen({
     super.key,
     required this.phone,
     this.isModal = false,
     this.redirectToCheckout = false,
+    this.isForgotPassword = false,
   });
 
   @override
@@ -75,6 +78,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (success) {
       final custId = authProvider.currentCustomer?.id;
       context.read<NotificationProvider>().loadForCustomer(custId);
+
+      final hasPassword = authProvider.hasPassword;
+
+      if (widget.isForgotPassword || !hasPassword) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => SetPasswordScreen(
+              isForgotPassword: widget.isForgotPassword,
+              redirectToCheckout: widget.redirectToCheckout,
+            ),
+          ),
+        );
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

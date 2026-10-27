@@ -11,6 +11,7 @@ import 'package:kmart_customer/providers/notification_provider.dart';
 import 'package:kmart_customer/services/auth_service.dart';
 import 'package:kmart_customer/services/location_service.dart';
 import 'package:kmart_customer/widgets/need_help_faq_sheet.dart';
+import 'package:kmart_customer/core/utils/validators.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -579,6 +580,26 @@ void main() {
 
       expect(totalItemHeight < containerHeight, true);
       expect(containerHeight - totalItemHeight >= 15, true);
+    });
+
+    test('34. Validators.validatePassword strictly requires minimum 8 characters', () {
+      expect(Validators.validatePassword(null), 'Please enter a password');
+      expect(Validators.validatePassword(''), 'Please enter a password');
+      expect(Validators.validatePassword('   '), 'Please enter a password');
+      expect(Validators.validatePassword('1234567'), 'Password must be at least 8 characters');
+      expect(Validators.validatePassword('pass123'), 'Password must be at least 8 characters');
+      expect(Validators.validatePassword('password123'), isNull);
+      expect(Validators.validatePassword('Kmart@2026'), isNull);
+    });
+
+    test('35. Password and OTP phone normalization matches exactly (+91 + 10 digits)', () {
+      const raw10 = '9876543210';
+      const formatted = '98765 43210';
+      const withCountry = '+919876543210';
+
+      expect(Validators.normalizeIndianMobile(raw10), '+919876543210');
+      expect(Validators.normalizeIndianMobile(formatted), '+919876543210');
+      expect(Validators.normalizeIndianMobile(withCountry), '+919876543210');
     });
   });
 }

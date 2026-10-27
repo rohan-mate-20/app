@@ -36,6 +36,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
 
   // Step 4: Payment method
   String _paymentMethod = 'ONLINE'; // 'ONLINE' (Razorpay) or 'COD'
+  bool _isPlacingOrder = false; // Mutex to prevent duplicate submissions
 
   // Step 2: Selected slot date
   String? _selectedSlotDate;
@@ -169,20 +170,24 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
   }
 
   void _handlePlaceOrder() async {
-    final authProvider = context.read<AuthProvider>();
-    final storeProvider = context.read<StoreDeliveryProvider>();
-    final cartProvider = context.read<CartProvider>();
     final ordersProvider = context.read<OrdersProvider>();
+    if (_isPlacingOrder || ordersProvider.isLoading) return;
+    setState(() => _isPlacingOrder = true);
 
-    if (cartProvider.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Your cart is empty'),
-          backgroundColor: AppColors.primaryRed,
-        ),
-      );
-      return;
-    }
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final storeProvider = context.read<StoreDeliveryProvider>();
+      final cartProvider = context.read<CartProvider>();
+
+      if (cartProvider.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your cart is empty'),
+            backgroundColor: AppColors.primaryRed,
+          ),
+        );
+        return;
+      }
 
     final slot = storeProvider.selectedSlot;
     if (_fulfillmentType == 'DELIVERY') {
@@ -290,6 +295,11 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
         },
       );
     }
+    } finally {
+      if (mounted) {
+        setState(() => _isPlacingOrder = false);
+      }
+    }
   }
 
   @override
@@ -373,7 +383,7 @@ class _CheckoutFlowScreenState extends State<CheckoutFlowScreen> {
                       child: KMartButton(
                         label: 'Continue to Pay ${CurrencyFormatter.format(totalAmount)}',
                         suffixIcon: Icons.arrow_forward_rounded,
-                        isLoading: ordersProvider.isLoading,
+                        isLoading: ordersProvider.isLoading || _isPlacingOrder,
                         onPressed: _handlePlaceOrder,
                       ),
                     ),

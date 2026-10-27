@@ -12,7 +12,8 @@ class DeliveryService {
           .from('delivery_settings')
           .select()
           .eq('id', 1)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
 
       if (response != null) {
         return DeliverySettingsModel.fromJson(response);
@@ -35,7 +36,8 @@ class DeliveryService {
 
       final response = await filter
           .order('slot_date', ascending: true)
-          .order('start_time', ascending: true);
+          .order('start_time', ascending: true)
+          .timeout(const Duration(seconds: 8));
 
       final list = response as List;
       if (list.isNotEmpty) {
